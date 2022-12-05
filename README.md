@@ -21,7 +21,7 @@ interface ValueFailure<T> {
 
 #### Value Object
 
-A `ValueObject` is an interface representing a validated value. Value objects, by convention, have a private primary
+A `ValueObject` is an interface representing a validated value. By convention, value objects have a private primary
 constructor, so that they are not instantiated outside a `ValueValidator`. A value object implementation must declare a
 companion object implementing a value validator when used in conjunction with the annotation processor library.
 
@@ -33,7 +33,7 @@ interface ValueObject<T> {
 
 #### Value Validator
 
-A `ValueValidator` is an interface defining value validation functions. The primary validation function,`of`, takes an
+A `ValueValidator` is an interface defining value validation functions. The primary validation function, `of`, takes an
 input and returns either a `ValueFailure` or a `ValueObject`. By convention, a value validator implementation is an
 abstract class, because the value object's private constructor is often passed to its primary constructor as a
 reference.
@@ -89,7 +89,7 @@ value class EmailAddress private constructor(override val value: String) : Value
 
 ## Annotation Processor
 
-The target annotation processor library takes the properties of a model template interface and generates three classes:
+The Target annotation processor library takes the properties of a model template interface and generates three classes:
 model, params, and builder.
 
 #### Model
@@ -138,7 +138,72 @@ data class ModelBuilder(/* ... */) : Buildable<ModelParams> {
 }
 ```
 
-### Example
+### Nested Models
+
+Nested models are a developing feature. A nested model property is defined just like any other property, with the type
+of its model interface. If the nested model is part of another domain and will be dynamically populated, e.g., by a
+repository, annotate it with `@External`.
+
+```kotlin
+@ModelTemplate("Test")
+interface TestModel {
+    /** ... */
+
+    @External
+    val child: TestChildModel?
+}
+
+@ModelTemplate("TestChild")
+interface TestChildModel {
+    /** ... */
+}
+```
+
+#### Limitations
+
+Nullable nested internal models are not easily updatable using the generated builder class, and are thus not
+recommended. In this example:
+
+```kotlin
+@ModelTemplate("Test")
+interface TestModel {
+    /** ... */
+
+    val child: TestChildModel?
+}
+
+@ModelTemplate("TestChild", customId = true)
+interface TestChildModel {
+    /** ... */
+}
+```
+
+The following builder field is generated:
+
+```kotlin
+data class TestBuilder(
+    /** ... */
+
+    val child: Option<TestChildBuilder?>
+)
+```
+
+Now, there are two conflicting use cases:
+
+1. When the intent is to update `TestChild`, but `Test.child` is null.
+2. When the intent is to create `TestChild`, but `TestBuilder.child` is not buildable to params.
+
+There is a consideration to update the generated field to something like:
+
+```kotlin
+Option<Either<TestChildBuilder?, TestChildParams>>
+```
+
+This would encompass the desired delete, update, and create use cases.
+
+### Usage
+
+Define a model template interface:
 
 ```kotlin
 @HasCreatedAndUpdated
@@ -148,108 +213,50 @@ interface UserModel {
     val lastName: LastName
     val username: Username?
     val emailAddress: EmailAddress
+
+    @External
+    val phoneNumber: UserPhoneNumberModel?
+}
+
+@HasCreatedAndUpdated
+@ModelTemplate("UserPhoneNumber", customId = true)
+interface UserPhoneNumberModel {
+    val userId: PositiveInt
+    val number: PhoneNumber
+    val validated: Boolean
 }
 ```
 
-Generates:
+Run a build and use the generated classes:
 
 ```kotlin
-data class User(
-    val id: PositiveInt,
-    val firstName: FirstName,
-    val lastName: LastName,
-    val username: Username?,
-    val emailAddress: EmailAddress,
-    val updated: Instant,
-    val created: Instant
-) {
-    companion object {
-        fun of(
-            id: Int,
-            firstName: String,
-            lastName: String,
-            username: String?,
-            emailAddress: String,
-            updated: Instant,
-            created: Instant
-        ): Either<ValueFailure<*>, User> = PositiveInt.of(id).flatMap { vId ->
-            FirstName.of(firstName).flatMap { vFirstName ->
-                LastName.of(lastName).flatMap { vLastName ->
-                    Username.ofNullable(username).flatMap { vUsername ->
-                        EmailAddress.of(emailAddress).map { vEmailAddress ->
-                            User(vId, vFirstName, vLastName, vUsername, vEmailAddress, updated, created)
-                        }
-                    }
-                }
-            }
-        }
+fun createUser() = repository.create(
+    UserParams.of(
+        firstName = "John",
+        lastName = "Doe",
+        username = "john.doe",
+        emailAddress = "john.doe@example.com",
+    )
+)
+
+fun greetUser(user: User) {
+    println("Hello, ${user.firstName.value}!")
+    println("Your account was created on ${user.created}.")
+}
+
+fun textUser(user: User, message: SmsTextMessage) = either {
+    ensureNotNull(user.phoneNumber) { NoPhoneNumber }.run {
+        ensure(validated) { NotValidated }
+        sendSms(number, message).bind()
     }
 }
 
-data class UserParams(
-    val firstName: FirstName,
-    val lastName: LastName,
-    val username: Username?,
-    val emailAddress: EmailAddress
-) {
-    companion object {
-        fun of(
-            firstName: String,
-            lastName: String,
-            username: String?,
-            emailAddress: String
-        ): Either<ValueFailure<*>, UserParams> = FirstName.of(firstName).flatMap { vFirstName ->
-            LastName.of(lastName).flatMap { vLastName ->
-                Username.ofNullable(username).flatMap { vUsername ->
-                    EmailAddress.of(emailAddress).map { vEmailAddress ->
-                        UserParams(vId, vFirstName, vLastName, vUsername, vEmailAddress)
-                    }
-                }
-            }
-        }
-    }
-}
-
-data class UserBuilder(
-    val firstName: Option<FirstName>,
-    val lastName: Option<LastName>,
-    val username: Option<Username?>,
-    val emailAddress: Option<EmailAddress>
-) : Buildable<UserParams> {
-    override fun build(): Option<UserParams> = firstName.flatMap { vFirstName ->
-        lastName.flatMap { vLastName ->
-            username.flatMap { vUsername ->
-                emailAddress.map { vEmailAddress ->
-                    UserParams(vId, vFirstName, vLastName, vUsername, vEmailAddress)
-                }
-            }
-        }
-    }
-
-    companion object {
-        fun of(
-            firstName: Option<String>,
-            lastName: Option<String>,
-            username: Option<String?>,
-            emailAddress: Option<String>
-        ): Either<ValueFailure<*>, UserBuilder> = FirstName.of(firstName).flatMap { vFirstName ->
-            LastName.of(lastName).flatMap { vLastName ->
-                Username.ofNullable(username).flatMap { vUsername ->
-                    EmailAddress.of(emailAddress).map { vEmailAddress ->
-                        UserBuilder(vId, vFirstName, vLastName, vUsername, vEmailAddress)
-                    }
-                }
-            }
-        }
-
-        fun only(
-            firstName: Option<FirstName> = None,
-            lastName: Option<LastName> = None,
-            username: Option<Username?> = None,
-            emailAddress: Option<EmailAddress> = None
-        ): UserBuilder = UserBuilder(firstName, lastName, username, emailAddress)
-    }
-}
+fun updateUser(id: PositiveInt) = repository.update(
+    id,
+    UserBuilder.only(
+        username = Some(null)
+    )
+)
 ```
 
 ## Roadmap
