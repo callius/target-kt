@@ -94,7 +94,7 @@ model, params, and builder.
 
 #### Model
 
-The model class is the complete model and contains a validation function, `of`, similar to `ValueValidator` which takes
+The model class is the complete model and contains a validation function, `of`, similar to `ValueValidator`, which takes
 the raw value object property types and performs a zip operation, calling each value object's validator and returning
 either the failure defined by the `ModelTemplate` annotation (`ValueFailure<*>` by default) or a model instance.
 
@@ -230,14 +230,16 @@ interface UserPhoneNumberModel {
 Run a build and use the generated classes:
 
 ```kotlin
-fun createUser() = repository.create(
-    UserParams.of(
-        firstName = "John",
-        lastName = "Doe",
-        username = "john.doe",
-        emailAddress = "john.doe@example.com",
-    )
-)
+fun createUser() = either {
+    repository.create(
+        UserParams.of(
+            firstName = "John",
+            lastName = "Doe",
+            username = "john.doe",
+            emailAddress = "john.doe@example.com",
+        ).bind()
+    ).bind()
+}
 
 fun greetUser(user: User) {
     println("Hello, ${user.firstName.value}!")
