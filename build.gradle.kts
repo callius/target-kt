@@ -5,6 +5,8 @@ plugins {
 }
 
 allprojects {
+    group = property("projects.group").toString()
+
     repositories {
         mavenCentral()
     }

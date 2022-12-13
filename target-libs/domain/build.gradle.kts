@@ -1,9 +1,10 @@
 @Suppress("DSL_SCOPE_VIOLATION")
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    id("config.publish")
 }
 
-version = "0.1.0"
+version = libs.versions.target.get()
 
 dependencies {
     implementation(libs.arrow.core)

@@ -11,10 +11,14 @@ project(":annotation").projectDir = File("target-libs/annotation")
 include("annotation-processor")
 project(":annotation-processor").projectDir = File("target-libs/annotation-processor")
 
+includeBuild("gradle-plugins/config-publish")
+
 dependencyResolutionManagement {
     @Suppress("UnstableApiUsage")
     versionCatalogs {
         create("libs") {
+            version("target", "0.1.0-SNAPSHOT")
+
             version("kotlin", "1.7.21")
             version("arrow", "1.1.3")
             version("junit", "5.8.1")
