@@ -2,14 +2,14 @@ enableFeaturePreview("VERSION_CATALOGS")
 
 rootProject.name = "target"
 
-include("domain")
-project(":domain").projectDir = File("target-libs/domain")
+include("target-domain")
+project(":target-domain").projectDir = File("target-libs/domain")
 
-include("annotation")
-project(":annotation").projectDir = File("target-libs/annotation")
+include("target-annotation")
+project(":target-annotation").projectDir = File("target-libs/annotation")
 
-include("annotation-processor")
-project(":annotation-processor").projectDir = File("target-libs/annotation-processor")
+include("target-annotation-processor")
+project(":target-annotation-processor").projectDir = File("target-libs/annotation-processor")
 
 includeBuild("gradle-plugins/config-publish")
 
