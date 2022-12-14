@@ -1,3 +1,5 @@
+@file:Suppress("SpellCheckingInspection")
+
 enableFeaturePreview("VERSION_CATALOGS")
 
 rootProject.name = "target"
