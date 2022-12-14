@@ -14,11 +14,10 @@ publishing {
 
             val releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
             val snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-            url = uri(snapshotsRepoUrl)
-//            url = uri(
-//                if (version.toString().endsWith("-SNAPSHOT", ignoreCase = true)) snapshotsRepoUrl
-//                else releasesRepoUrl
-//            )
+            url = uri(
+                if (propertyString("target.version").endsWith("-SNAPSHOT", ignoreCase = true)) snapshotsRepoUrl
+                else releasesRepoUrl
+            )
 
             credentials {
                 username = propertyString("ossrhUsername")
