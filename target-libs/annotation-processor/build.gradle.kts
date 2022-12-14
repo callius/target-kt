@@ -5,12 +5,13 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 @Suppress("DSL_SCOPE_VIOLATION")
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    id("io.target-kt.target-gradle-config-publish")
 }
 
-version = "0.1.0"
+version = libs.versions.target.get()
 
 dependencies {
-    implementation(project(":annotation"))
+    implementation(project(":target-annotation"))
     implementation(libs.kotlinpoet)
     implementation(libs.kotlinpoet.ksp)
     implementation(libs.ksp)
