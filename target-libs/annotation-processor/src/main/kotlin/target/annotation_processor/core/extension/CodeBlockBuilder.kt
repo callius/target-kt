@@ -50,93 +50,10 @@ inline fun CodeBlock.Builder.addOptionPropertyReceiver(
                 block()
             }
         }
+
         is ModelPropertyType.Standard,
         is ModelPropertyType.ValueObject -> add(param.name).block()
     }
-}
-
-/**
- * Applies a zip function for the given value object [properties], calling the value validator.
- */
-inline fun CodeBlock.Builder.ofAndZip(
-    properties: List<ModelProperty>,
-    failure: ClassName,
-    crossinline block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    when {
-        properties.isEmpty() -> {
-            add("%T(", ClassNames.right)
-            block()
-            add(")")
-        }
-        properties.size == 1 -> {
-            if (failure.isValueFailure()) {
-                ofAndMap(properties.first(), block)
-            } else {
-                ofAndBimap(
-                    properties.first(),
-                    { add(failure.constructorReference()) },
-                    { block() }
-                )
-            }
-        }
-        else -> {
-            ofAndFlatMap(properties.dropLast(1)) {
-                ofAndMap(properties.last()) {
-                    block()
-                }
-            }
-            if (!failure.isValueFailure()) {
-                mapLeftFailure(failure)
-            }
-        }
-    }
-}
-
-/**
- * Calls the value validator for the given value object [property], then calls 'map' with the given [block] body.
- */
-inline fun CodeBlock.Builder.ofAndMap(
-    property: ModelProperty,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    of(property)
-    beginControlFlow(
-        ".map·{ ${property.vName} ->",
-    )
-    block()
-    endControlFlow()
-}
-
-/**
- * Calls the value validator for the given value object [property], checking for nullability.
- */
-fun CodeBlock.Builder.of(property: ModelProperty): CodeBlock.Builder = apply {
-    val nonNullableType = property.type.type.copy(nullable = false)
-    if (property.type.type.isNullable) {
-        add("%T.ofNullable(${property.name})", nonNullableType)
-    } else {
-        add("%T.of(${property.name})", nonNullableType)
-    }
-}
-
-/**
- * Calls the value validator for the given value object [param], then calls 'bimap' with [ifLeft], and [ifRight].
- */
-inline fun CodeBlock.Builder.ofAndBimap(
-    param: ModelProperty,
-    ifLeft: CodeBlock.Builder.() -> CodeBlock.Builder,
-    ifRight: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    add(
-        "%T.of(${param.name}).bimap(",
-        param.type
-    )
-    ifLeft()
-    beginControlFlow(", { ${param.vName} ->")
-    ifRight()
-    endFlowControl(false)
-    add(")")
 }
 
 /**
@@ -149,72 +66,6 @@ fun CodeBlock.Builder.endFlowControl(endNewLine: Boolean): CodeBlock.Builder = a
         unindent()
         add("}")
     }
-}
-
-/**
- * Recursively calls the value validator, then 'flatMap' for the given value object [properties],
- * applying the [block] to the innermost body.
- */
-fun CodeBlock.Builder.ofAndFlatMap(
-    properties: List<ModelProperty>,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    if (properties.isEmpty()) {
-        block()
-    } else {
-        ofAndFlatMap(properties.dropLast(1)) {
-            ofAndFlatMap(properties.last(), properties.size != 1, block)
-        }
-    }
-}
-
-/**
- * Calls the value validator for the given value object [property], then calls 'flatMap' with the given [block] body.
- */
-inline fun CodeBlock.Builder.ofAndFlatMap(
-    property: ModelProperty,
-    endNewLine: Boolean = true,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    of(property)
-    beginControlFlow(
-        ".%M·{ ${property.vName} ->",
-        MemberNames.flatMap
-    )
-    block()
-    endFlowControl(endNewLine)
-}
-
-/**
- * Recursively calls 'flatMap' for the given [properties], applying the [block] to the innermost body.
- */
-fun CodeBlock.Builder.flatMap(
-    properties: List<ModelProperty>,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    if (properties.isEmpty()) {
-        block()
-    } else {
-        flatMap(properties.dropLast(1)) {
-            flatMap(properties.last(), properties.size != 1, block)
-        }
-    }
-}
-
-/**
- * Calls 'flatMap' for the given [property] with the given [block] body.
- */
-inline fun CodeBlock.Builder.flatMap(
-    property: ModelProperty,
-    endNewLine: Boolean = true,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    beginControlFlow(
-        "${property.name}.%M·{ ${property.vName} ->",
-        MemberNames.flatMap
-    )
-    block()
-    endFlowControl(endNewLine)
 }
 
 /**
@@ -276,35 +127,113 @@ inline fun CodeBlock.Builder.map(
     endControlFlow()
 }
 
-/**
- * Calls 'mapLeft' with a reference to the constructor of the given [className].
- */
-fun CodeBlock.Builder.mapLeftFailure(className: ClassName): CodeBlock.Builder = apply {
-    add(".mapLeft(")
-    add(className.constructorReference())
-    add(")")
+fun CodeBlock.Builder.validateModel(
+    properties: List<ModelProperty>,
+    model: ClassName
+): CodeBlock.Builder = apply {
+    val valueObjects = mutableListOf<Pair<ModelProperty, ModelPropertyType.ValueObject>>()
+    properties.forEach {
+        when (it.type) {
+            is ModelPropertyType.ModelTemplate,
+            is ModelPropertyType.Standard -> Unit
+
+            is ModelPropertyType.ValueObject -> {
+                valueObjects.add(it to it.type)
+
+                val nonNullableType = it.type.type.copy(nullable = false)
+                if (it.type.type.isNullable) {
+                    addStatement("val ${it.vName} = %T.ofNullable(${it.name})", nonNullableType)
+                } else {
+                    addStatement("val ${it.vName} = %T.of(${it.name})", nonNullableType)
+                }
+            }
+        }
+    }
+    if (valueObjects.isEmpty()) {
+        addStatement("return %T(%T(" + properties.joinToString(", ") { it.name } + "))", ClassNames.right, model)
+    } else if (valueObjects.size == 1) {
+        // NOTE: Can be replaced with fold or bimap.
+        val first = valueObjects.first()
+        beginControlFlow(
+            "return if (${first.first.vName} is %T)",
+            ClassNames.right
+        )
+        rightConstructorCall(model, properties)
+        nextControlFlow("else")
+        addStatement("%T(", ClassNames.left)
+        indent()
+        addStatement("%T(", ClassNames.nonEmptyList)
+        indent()
+        addStatement(
+            "%T((${first.first.vName} as %T).value),",
+            first.second.fieldFailureClassName,
+            ClassNames.left,
+        )
+        addStatement("emptyList()")
+        unindent()
+        addStatement(")")
+        unindent()
+        addStatement(")")
+        endControlFlow()
+    } else {
+        beginControlFlow(
+            "return if (" + valueObjects.joinToString(" && ") { "${it.first.vName} is %T" } + ")",
+            *valueObjects.map { ClassNames.right }.toTypedArray()
+        )
+        rightConstructorCall(model, properties)
+        nextControlFlow("else")
+        addStatement("%T(", ClassNames.left)
+        indent()
+        addStatement("%T.fromListUnsafe(", ClassNames.nonEmptyList)
+        indent()
+        beginControlFlow("buildList")
+        valueObjects.forEach {
+            addStatement(
+                "if (${it.first.vName} is %T) add(%T(${it.first.vName}.value))",
+                ClassNames.left,
+                it.second.fieldFailureClassName
+            )
+        }
+        endControlFlow()
+        unindent()
+        addStatement(")")
+        unindent()
+        addStatement(")")
+        endControlFlow()
+    }
 }
 
-fun CodeBlock.Builder.ofAndZipConstructor(
-    params: List<ModelProperty>,
-    failure: ClassName,
-    model: ClassName
-): CodeBlock.Builder = ofAndZip(params.filter { it.type is ModelPropertyType.ValueObject }, failure) {
-    constructorCall(model, params = params)
-}
+fun CodeBlock.Builder.rightConstructorCall(
+    className: ClassName,
+    parameters: List<ModelProperty>
+): CodeBlock.Builder = addStatement(
+    "%T(%T(" + parameters.joinToString(", ") {
+        when (it.type) {
+            is ModelPropertyType.ModelTemplate,
+            is ModelPropertyType.Standard -> it.name
+
+            is ModelPropertyType.ValueObject -> "${it.vName}.value"
+        }
+    } + "))",
+    ClassNames.right,
+    className
+)
 
 fun CodeBlock.Builder.constructorCall(
     className: ClassName,
     params: List<ModelProperty>,
     checkVName: Boolean = true
-): CodeBlock.Builder = add("%T(%L)\n", className, params.joinToString(", ") {
-    if (checkVName && it.type is ModelPropertyType.ValueObject) it.vName else it.name
-})
+): CodeBlock.Builder = add(
+    "%T(" + params.joinToString(", ") {
+        if (checkVName && it.type is ModelPropertyType.ValueObject) it.vName else it.name
+    } + ")\n",
+    className
+)
 
 fun CodeBlock.Builder.vNameConstructorCall(
     className: ClassName,
-    params: List<ModelProperty>,
-): CodeBlock.Builder = add("%T(%L)\n", className, params.joinToString(", ") { it.vName })
+    params: List<ModelProperty>
+): CodeBlock.Builder = add("%T(" + params.joinToString(", ") { it.vName } + ")\n", className)
 
 /**
  * Adds a return statement.

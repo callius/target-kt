@@ -1,7 +1,6 @@
 package target.annotation_processor.core
 
 import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import target.annotation_processor.core.domain.*
 import target.annotation_processor.core.extension.*
 
@@ -56,16 +55,10 @@ fun generateBuilderSpec(
                                 ParameterSpec.builder(it.name, it.type.toValueObjectTypeName()).build()
                             }
                         )
-                        .returns(
-                            ClassNames.either.parameterizedBy(
-                                failureClassName.asFailureReturnType(),
-                                builderClassName
-                            )
-                        )
+                        .returns(eitherOf(nelOf(failureClassName), builderClassName))
                         .addCode(
-                            CodeBlock.builder().rtrn().ofAndZipConstructor(
-                                params = paramsProperties,
-                                failure = failureClassName,
+                            CodeBlock.builder().validateModel(
+                                properties = paramsProperties,
                                 model = builderClassName
                             ).build()
                         )
@@ -101,6 +94,7 @@ private fun ModelPropertyType.toTypeName(): TypeName {
             type.packageName,
             type.simpleName.appendBuilder()
         ).withNullability(type.isNullable)
+
         is ModelPropertyType.Standard -> type.withTypeArguments(
             typeArguments.map {
                 when (it) {
@@ -109,6 +103,7 @@ private fun ModelPropertyType.toTypeName(): TypeName {
                 }
             }
         )
+
         is ModelPropertyType.ValueObject -> type
     }
 }
@@ -119,6 +114,7 @@ private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
             type.packageName,
             type.simpleName.appendBuilder()
         ).withNullability(type.isNullable)
+
         is ModelPropertyType.Standard -> type.withTypeArguments(
             typeArguments.map {
                 when (it) {
@@ -127,6 +123,7 @@ private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
                 }
             }
         )
+
         is ModelPropertyType.ValueObject -> valueObjectType
     }
 }
