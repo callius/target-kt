@@ -89,19 +89,37 @@ value class EmailAddress private constructor(override val value: String) : Value
 
 ## Annotation Processor
 
-The Target annotation processor library takes the properties of a model template interface and generates three classes:
-model, params, and builder.
+The Target annotation processor library takes the properties of a model template interface and generates four main
+classes: failure, model, params, and builder.
+
+#### Failure
+
+The failure class is a sealed interface containing data classes for each value object property declared on the model
+template, containing a single value, `parent`, with a type of the value object validator's failure type. A required
+variant of the failure interface is also generated and is assigned to failures for properties not annotated
+with `@External`.
+
+```kotlin
+sealed interface ModelRequiredFieldFailure : ModelFieldFailure
+
+sealed interface ModelFieldFailure {
+
+    data class ExternalProperty(val parent: ExternalPropertyFailure) : ModelFieldFailure
+
+    data class Property(val parent: PropertyFailure) : ModelRequiredFieldFailure
+}
+```
 
 #### Model
 
 The model class is the complete model and contains a validation function, `of`, similar to `ValueValidator`, which takes
-the raw value object property types and performs a zip operation, calling each value object's validator and returning
-either the failure defined by the `ModelTemplate` annotation (`ValueFailure<*>` by default) or a model instance.
+the raw value object property types and performs cumulative validation, calling each value object's validator and
+returning either a non-empty list of model field failures or a model instance.
 
 ```kotlin
 data class Model(/* ... */) {
     companion object {
-        fun of(/* ... */): Either<ValueFailure<*>, Model>
+        fun of(/* ... */): Either<Nel<ModelFieldFailure>, Model>
     }
 }
 ```
@@ -114,7 +132,7 @@ to contain all the required/non-generated properties used to create a model.
 ```kotlin
 data class ModelParams(/* ... */) {
     companion object {
-        fun of(/* ... */): Either<ValueFailure<*>, ModelParams>
+        fun of(/* ... */): Either<Nel<ModelRequiredFieldFailure>, ModelParams>
     }
 }
 ```
@@ -123,7 +141,7 @@ data class ModelParams(/* ... */) {
 
 The builder class is the params class with each property wrapped in an `Option` and implements the `Buildable` interface
 by performing a zip operation on its properties. It is intended to be used to perform a partial update operation on a
-model. It also contains a convenience `only` function, which delegates to the primary constructor with each parameter
+model. It also contains a convenience function, `only`, which delegates to the primary constructor with each parameter
 defaulting to `None`.
 
 ```kotlin
@@ -131,7 +149,7 @@ data class ModelBuilder(/* ... */) : Buildable<ModelParams> {
     override fun build(): Option<ModelParams>
 
     companion object {
-        fun of(/* ... */): Either<ValueFailure<*>, ModelBuilder>
+        fun of(/* ... */): Either<Nel<ModelRequiredFieldFailure>, ModelBuilder>
 
         fun only(/* ... */): ModelBuilder
     }
@@ -263,8 +281,7 @@ fun updateUser(id: PositiveInt) = repository.update(
 
 ## Roadmap
 
-1. Generate cumulative model validation functions, instead of the current fail-fast behavior. (in QA)
-2. Clean up `ModelTemplate` and other annotations for a more intuitive experience.
-3. Add a configuration property to define the generated timestamp implementation type (currently `java.time.Instant`)
+1. Clean up `ModelTemplate` and other annotations for a more intuitive experience.
+2. Add a configuration property to define the generated timestamp implementation type (currently `java.time.Instant`)
    and support `kotlinx.datetime.Instant` as the new default.
-4. Support Kotlin Multiplatform.
+3. Support Kotlin Multiplatform.
