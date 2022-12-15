@@ -7,5 +7,5 @@ plugins {
 version = libs.versions.target.get()
 
 dependencies {
-    implementation(project(":target-domain"))
+    implementation(project(":target-core"))
 }

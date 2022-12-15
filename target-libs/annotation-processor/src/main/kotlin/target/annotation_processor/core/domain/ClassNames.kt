@@ -11,8 +11,8 @@ object ClassNames {
     val some = ClassName("arrow.core", "Some")
     val none = ClassName("arrow.core", "None")
 
-    val positiveInt = ClassName("target.domain.value_object", "PositiveInt")
-    val buildable = ClassName("target.domain", "Buildable")
+    val positiveInt = ClassName("target.core.valueobject", "PositiveInt")
+    val buildable = ClassName("target.core", "Buildable")
     val int = ClassName("kotlin", "Int")
 }
 

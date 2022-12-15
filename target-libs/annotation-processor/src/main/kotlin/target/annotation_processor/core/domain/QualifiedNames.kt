@@ -6,8 +6,8 @@ object QualifiedNames {
     const val arrowFlatMap = "arrow.core.flatMap"
 
     const val modelTemplate = "target.annotation.ModelTemplate"
-    const val valueFailure = "target.domain.ValueFailure"
-    const val valueObject = "target.domain.ValueObject"
+    const val valueFailure = "target.core.ValueFailure"
+    const val valueObject = "target.core.ValueObject"
 
     const val iterable = "kotlin.collections.Iterable"
     const val list = "kotlin.collections.List"

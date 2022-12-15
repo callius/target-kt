@@ -1,6 +1,6 @@
 package target.annotation
 
-import target.domain.value_object.PositiveInt
+import target.core.valueobject.PositiveInt
 
 /**
  * Marks a [ModelTemplate] as having a creatorId field. Generated as:
