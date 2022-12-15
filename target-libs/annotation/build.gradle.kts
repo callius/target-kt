@@ -6,6 +6,10 @@ plugins {
 
 version = libs.versions.target.get()
 
+java {
+    withSourcesJar()
+}
+
 dependencies {
     implementation(project(":target-core"))
 }

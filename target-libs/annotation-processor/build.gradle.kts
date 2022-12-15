@@ -10,6 +10,10 @@ plugins {
 
 version = libs.versions.target.get()
 
+java {
+    withSourcesJar()
+}
+
 dependencies {
     implementation(project(":target-annotation"))
     implementation(libs.kotlinpoet)
