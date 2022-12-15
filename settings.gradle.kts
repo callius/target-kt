@@ -4,8 +4,8 @@ enableFeaturePreview("VERSION_CATALOGS")
 
 rootProject.name = "target"
 
-include("target-domain")
-project(":target-domain").projectDir = File("target-libs/domain")
+include("target-core")
+project(":target-core").projectDir = File("target-libs/core")
 
 include("target-annotation")
 project(":target-annotation").projectDir = File("target-libs/annotation")

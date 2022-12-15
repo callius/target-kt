@@ -1,7 +1,7 @@
 package target.annotation
 
-import target.domain.ValueFailure
-import target.domain.value_object.PositiveInt
+import target.core.ValueFailure
+import target.core.valueobject.PositiveInt
 import kotlin.reflect.KClass
 
 /**
