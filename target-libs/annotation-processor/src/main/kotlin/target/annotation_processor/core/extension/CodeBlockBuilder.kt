@@ -184,8 +184,6 @@ fun CodeBlock.Builder.validateModel(
         nextControlFlow("else")
         addStatement("%T(", ClassNames.left)
         indent()
-        addStatement("%T.fromListUnsafe(", ClassNames.nonEmptyList)
-        indent()
         beginControlFlow("buildList")
         valueObjects.forEach {
             addStatement(
@@ -195,8 +193,7 @@ fun CodeBlock.Builder.validateModel(
             )
         }
         endControlFlow()
-        unindent()
-        addStatement(")")
+        addStatement(".%M()!!", MemberNames.toNonEmptyListOrNull)
         unindent()
         addStatement(")")
         endControlFlow()
