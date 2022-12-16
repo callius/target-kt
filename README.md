@@ -100,13 +100,13 @@ variant of the failure interface is also generated and is assigned to failures f
 with `@External`.
 
 ```kotlin
-sealed interface ModelRequiredFieldFailure : ModelFieldFailure
+sealed interface ModelRequiredFieldFailure
 
 sealed interface ModelFieldFailure {
 
     data class ExternalProperty(val parent: ExternalPropertyFailure) : ModelFieldFailure
 
-    data class Property(val parent: PropertyFailure) : ModelRequiredFieldFailure
+    data class Property(val parent: PropertyFailure) : ModelFieldFailure, ModelRequiredFieldFailure
 }
 ```
 
