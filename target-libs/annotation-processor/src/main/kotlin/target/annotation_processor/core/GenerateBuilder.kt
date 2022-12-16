@@ -59,7 +59,8 @@ fun generateBuilderSpec(
                         .addCode(
                             CodeBlock.builder().validateModel(
                                 properties = paramsProperties,
-                                model = builderClassName
+                                model = builderClassName,
+                                getModelPropertyFailure = { requiredFieldFailureClassName }
                             ).build()
                         )
                         .build()
@@ -110,9 +111,9 @@ private fun ModelPropertyType.toTypeName(): TypeName {
 
 private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
     return when (this) {
-        is ModelPropertyType.ModelTemplate -> ClassName(
-            type.packageName,
-            type.simpleName.appendBuilder()
+        is ModelPropertyType.ModelTemplate -> eitherOf(
+            nelOf(requiredFieldFailureType),
+            ClassName(type.packageName, type.simpleName.appendBuilder())
         ).withNullability(type.isNullable)
 
         is ModelPropertyType.Standard -> type.withTypeArguments(

@@ -127,31 +127,35 @@ inline fun CodeBlock.Builder.map(
     endControlFlow()
 }
 
-fun CodeBlock.Builder.validateModel(
+// TODO: Split this into multiple functions to validate model template parameters. Builder and model/params.
+inline fun CodeBlock.Builder.validateModel(
     properties: List<ModelProperty>,
-    model: ClassName
+    model: ClassName,
+    getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
 ): CodeBlock.Builder = apply {
-    val valueObjects = mutableListOf<Pair<ModelProperty, ModelPropertyType.ValueObject>>()
-    properties.forEach {
-        when (it.type) {
-            is ModelPropertyType.ModelTemplate,
-            is ModelPropertyType.Standard -> Unit
-
-            is ModelPropertyType.ValueObject -> {
-                valueObjects.add(it to it.type)
-
-                val nonNullableType = it.type.type.copy(nullable = false)
-                if (it.type.type.isNullable) {
-                    addStatement("val ${it.vName} = %T.ofNullable(${it.name})", nonNullableType)
-                } else {
-                    addStatement("val ${it.vName} = %T.of(${it.name})", nonNullableType)
-                }
+    val valueObjects = properties
+        .mapNotNull { if (it.type is ModelPropertyType.ValueObject) it to it.type else null }
+        .onEach {
+            val nonNullableType = it.second.type.copy(nullable = false)
+            if (it.second.type.isNullable) {
+                addStatement("val ${it.first.vName} = %T.ofNullable(${it.first.name})", nonNullableType)
+            } else {
+                addStatement("val ${it.first.vName} = %T.of(${it.first.name})", nonNullableType)
             }
         }
-    }
-    if (valueObjects.isEmpty()) {
+
+    // Finding model templates and adding local values mapping null to right.
+    val modelTemplateProperties = properties
+        .mapNotNull { if (it.type is ModelPropertyType.ModelTemplate) it to it.type else null }
+        .onEach {
+            if (it.second.type.isNullable) {
+                addStatement("val ${it.first.vName} = ${it.first.name} ?: %T(null)", ClassNames.right)
+            }
+        }
+
+    if (valueObjects.isEmpty() && modelTemplateProperties.isEmpty()) {
         addStatement("return %T(%T(" + properties.joinToString(", ") { it.name } + "))", ClassNames.right, model)
-    } else if (valueObjects.size == 1) {
+    } else if (valueObjects.size == 1 && modelTemplateProperties.isEmpty()) {
         // NOTE: Can be replaced with fold or bimap.
         val first = valueObjects.first()
         beginControlFlow(
@@ -176,20 +180,22 @@ fun CodeBlock.Builder.validateModel(
         addStatement(")")
         endControlFlow()
     } else {
+        val vNamesAndFailures = valueObjects.map { it.first.vName to it.second.fieldFailureClassName } +
+                modelTemplateProperties.map { it.first.vNameIfNullable() to getModelPropertyFailure(it.second) }
         beginControlFlow(
-            "return if (" + valueObjects.joinToString(" && ") { "${it.first.vName} is %T" } + ")",
-            *valueObjects.map { ClassNames.right }.toTypedArray()
+            "return if (${vNamesAndFailures.joinToString(" && ") { "${it.first} is %T" }})",
+            *vNamesAndFailures.map { ClassNames.right }.toTypedArray()
         )
         rightConstructorCall(model, properties)
         nextControlFlow("else")
         addStatement("%T(", ClassNames.left)
         indent()
         beginControlFlow("buildList")
-        valueObjects.forEach {
+        vNamesAndFailures.forEach {
             addStatement(
-                "if (${it.first.vName} is %T) add(%T(${it.first.vName}.value))",
+                "if (${it.first} is %T) add(%T(${it.first}.value))",
                 ClassNames.left,
-                it.second.fieldFailureClassName
+                it.second
             )
         }
         endControlFlow()
@@ -206,9 +212,8 @@ fun CodeBlock.Builder.rightConstructorCall(
 ): CodeBlock.Builder = addStatement(
     "%T(%T(" + parameters.joinToString(", ") {
         when (it.type) {
-            is ModelPropertyType.ModelTemplate,
+            is ModelPropertyType.ModelTemplate -> "${if (it.type.type.isNullable) it.vName else it.name}.value"
             is ModelPropertyType.Standard -> it.name
-
             is ModelPropertyType.ValueObject -> "${it.vName}.value"
         }
     } + "))",

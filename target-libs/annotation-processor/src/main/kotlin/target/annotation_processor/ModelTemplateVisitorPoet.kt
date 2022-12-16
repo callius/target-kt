@@ -77,10 +77,7 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
             generateFileSpec(
                 packageName = packageName,
                 fileName = fieldFailureName,
-                generateRequiredFieldFailureSpec(
-                    requiredFieldFailureName = requiredFieldFailureName,
-                    fieldFailureClassName = fieldFailureClassName
-                ),
+                generateRequiredFieldFailureSpec(requiredFieldFailureName),
                 generateFieldFailureSpec(
                     fieldFailureClassName = fieldFailureClassName,
                     requiredFieldFailureClassName = requiredFieldFailureClassName,
@@ -264,11 +261,20 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                 )
             }
         } else {
+            val modelName = modelTemplate.nameArgument()
+            val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
             ModelPropertyType.ModelTemplate(
-                ClassName(
+                type = ClassName(typeDeclaration.packageName.asString(), modelName).withNullability(type.nullability),
+                fieldFailureType = ClassName(
                     typeDeclaration.packageName.asString(),
-                    modelTemplate.nameArgument()
-                ).withNullability(type.nullability)
+                    modelName.appendFieldFailure()
+                ),
+                requiredFieldFailureType = ClassName(
+                    typeDeclaration.packageName.asString(),
+                    modelName.appendRequiredFieldFailure()
+                ),
+                fieldFailureClassName = fieldFailureClassName.nestedClass(upperPropertyName),
+                requiredFieldFailureClassName = fieldFailureClassName.nestedClass("Required$upperPropertyName")
             )
         }
     }

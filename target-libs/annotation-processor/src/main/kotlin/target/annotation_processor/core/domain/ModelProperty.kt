@@ -28,4 +28,6 @@ data class ModelProperty(
     val vName: String get() = 'v' + name.replaceFirstChar { it.uppercaseChar() }
 
     val isNotExternal: Boolean get() = !isExternal
+
+    fun vNameIfNullable() = if (type.type.isNullable) vName else name
 }

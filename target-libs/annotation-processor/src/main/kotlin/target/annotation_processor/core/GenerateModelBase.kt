@@ -12,7 +12,8 @@ inline fun generateModelSpecBase(
     modelClassName: ClassName,
     properties: List<ModelProperty>,
     toTypeName: ModelPropertyType.() -> TypeName,
-    toValueObjectTypeName: ModelPropertyType.() -> TypeName
+    toValueObjectTypeName: ModelPropertyType.() -> TypeName,
+    getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
 ): TypeSpec {
     return TypeSpec.classBuilder(modelClassName)
         .addModifiers(KModifier.DATA)
@@ -40,7 +41,8 @@ inline fun generateModelSpecBase(
                     .addCode(
                         CodeBlock.builder().validateModel(
                             properties = properties,
-                            model = modelClassName
+                            model = modelClassName,
+                            getModelPropertyFailure = getModelPropertyFailure
                         ).build()
                     )
                     .build()
