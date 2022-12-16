@@ -127,66 +127,89 @@ inline fun CodeBlock.Builder.map(
     endControlFlow()
 }
 
-// TODO: Split this into multiple functions to validate model template parameters. Builder and model/params.
 inline fun CodeBlock.Builder.validateModel(
     properties: List<ModelProperty>,
     model: ClassName,
     getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
 ): CodeBlock.Builder = apply {
-    val valueObjects = properties
-        .mapNotNull { if (it.type is ModelPropertyType.ValueObject) it to it.type else null }
-        .onEach {
-            val nonNullableType = it.second.type.copy(nullable = false)
-            if (it.second.type.isNullable) {
-                addStatement("val ${it.first.vName} = %T.ofNullable(${it.first.name})", nonNullableType)
-            } else {
-                addStatement("val ${it.first.vName} = %T.of(${it.first.name})", nonNullableType)
-            }
-        }
+    val typedProperties = properties.mapToTyped { if (type.type.isNullable) vName else name }
+    validateValueObjects(typedProperties)
+    validateModelTemplates(typedProperties)
+    returnValidatedModel(model, typedProperties, getModelPropertyFailure)
+}
 
-    // Finding model templates and adding local values mapping null to right.
-    val modelTemplateProperties = properties
-        .mapNotNull { if (it.type is ModelPropertyType.ModelTemplate) it to it.type else null }
-        .onEach {
-            if (it.second.type.isNullable) {
-                addStatement("val ${it.first.vName} = ${it.first.name} ?: %T(null)", ClassNames.right)
-            }
-        }
+inline fun CodeBlock.Builder.validateModelBuilder(
+    properties: List<ModelProperty>,
+    model: ClassName,
+    getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
+): CodeBlock.Builder = apply {
+    val typedProperties = properties.mapToTyped { vName }
+    validateValueObjects(typedProperties)
+    validateModelTemplatesOption(typedProperties)
+    returnValidatedModel(model, typedProperties, getModelPropertyFailure)
+}
 
-    if (valueObjects.isEmpty() && modelTemplateProperties.isEmpty()) {
-        addStatement("return %T(%T(" + properties.joinToString(", ") { it.name } + "))", ClassNames.right, model)
-    } else if (valueObjects.size == 1 && modelTemplateProperties.isEmpty()) {
-        // NOTE: Can be replaced with fold or bimap.
-        val first = valueObjects.first()
-        beginControlFlow(
-            "return if (${first.first.vName} is %T)",
-            ClassNames.right
-        )
-        rightConstructorCall(model, properties)
-        nextControlFlow("else")
-        addStatement("%T(", ClassNames.left)
-        indent()
-        addStatement("%T(", ClassNames.nonEmptyList)
-        indent()
+inline fun List<ModelProperty>.mapToTyped(validatedName: ModelProperty.() -> String) = map {
+    when (it.type) {
+        is ModelPropertyType.Standard -> TypedModelProperty.Standard(it)
+        is ModelPropertyType.ValueObject -> TypedModelProperty.ValueObject(it, it.type, it.vName)
+        is ModelPropertyType.ModelTemplate -> TypedModelProperty.ModelTemplate(it, it.type, it.validatedName())
+    }
+}
+
+fun CodeBlock.Builder.validateValueObjects(properties: List<TypedModelProperty>) = properties.forEach {
+    if (it is TypedModelProperty.ValueObject) {
+        val nonNullableType = it.type.type.copy(nullable = false)
+        if (it.type.type.isNullable) {
+            addStatement("val ${it.property.vName} = %T.ofNullable(${it.property.name})", nonNullableType)
+        } else {
+            addStatement("val ${it.property.vName} = %T.of(${it.property.name})", nonNullableType)
+        }
+    }
+}
+
+fun CodeBlock.Builder.validateModelTemplates(properties: List<TypedModelProperty>) = properties.forEach {
+    if (it is TypedModelProperty.ModelTemplate) {
+        if (it.type.type.isNullable) {
+            addStatement("val ${it.property.vName} = ${it.property.name} ?: %T(null)", ClassNames.right)
+        }
+    }
+}
+
+fun CodeBlock.Builder.validateModelTemplatesOption(properties: List<TypedModelProperty>) = properties.forEach {
+    if (it is TypedModelProperty.ModelTemplate) {
+        if (it.type.type.isNullable) {
+            addStatement("val ${it.property.vName} = ${it.property.name}.traverse { it ?: %T(null) }", ClassNames.right)
+        } else {
+            addStatement("val ${it.property.vName} = ${it.property.name}.traverse(::%M)", MemberNames.identity)
+        }
+    }
+}
+
+inline fun CodeBlock.Builder.returnValidatedModel(
+    model: ClassName,
+    typedProperties: List<TypedModelProperty>,
+    getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
+) {
+    if (typedProperties.all { it.validatedName == null }) {
         addStatement(
-            "%T((${first.first.vName} as %T).value),",
-            first.second.fieldFailureClassName,
-            ClassNames.left,
+            "return %T(%T(" + typedProperties.joinToString(", ") { it.property.name } + "))",
+            ClassNames.right,
+            model
         )
-        addStatement("emptyList()")
-        unindent()
-        addStatement(")")
-        unindent()
-        addStatement(")")
-        endControlFlow()
     } else {
-        val vNamesAndFailures = valueObjects.map { it.first.vName to it.second.fieldFailureClassName } +
-                modelTemplateProperties.map { it.first.vNameIfNullable() to getModelPropertyFailure(it.second) }
+        val vNamesAndFailures = typedProperties.mapNotNull {
+            when (it) {
+                is TypedModelProperty.Standard -> null
+                is TypedModelProperty.ValueObject -> it.validatedName to it.type.fieldFailureClassName
+                is TypedModelProperty.ModelTemplate -> it.validatedName to getModelPropertyFailure(it.type)
+            }
+        }
         beginControlFlow(
             "return if (${vNamesAndFailures.joinToString(" && ") { "${it.first} is %T" }})",
             *vNamesAndFailures.map { ClassNames.right }.toTypedArray()
         )
-        rightConstructorCall(model, properties)
+        rightConstructorCall(model, typedProperties)
         nextControlFlow("else")
         addStatement("%T(", ClassNames.left)
         indent()
@@ -208,14 +231,10 @@ inline fun CodeBlock.Builder.validateModel(
 
 fun CodeBlock.Builder.rightConstructorCall(
     className: ClassName,
-    parameters: List<ModelProperty>
+    parameters: List<TypedModelProperty>
 ): CodeBlock.Builder = addStatement(
-    "%T(%T(" + parameters.joinToString(", ") {
-        when (it.type) {
-            is ModelPropertyType.ModelTemplate -> "${if (it.type.type.isNullable) it.vName else it.name}.value"
-            is ModelPropertyType.Standard -> it.name
-            is ModelPropertyType.ValueObject -> "${it.vName}.value"
-        }
+    "%T(%T(" + parameters.joinToString(", ") { param ->
+        param.validatedName?.let { "$it.value" } ?: param.property.name
     } + "))",
     ClassNames.right,
     className

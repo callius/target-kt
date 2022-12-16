@@ -97,7 +97,7 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                 packageName = packageName,
                 fileName = paramsName,
                 generateParamsSpec(
-                    failureClassName = fieldFailureClassName,
+                    failureClassName = requiredFieldFailureClassName,
                     modelClassName = paramsClassName,
                     properties = paramsProperties
                 )

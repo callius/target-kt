@@ -57,7 +57,7 @@ fun generateBuilderSpec(
                         )
                         .returns(eitherOf(nelOf(failureClassName), builderClassName))
                         .addCode(
-                            CodeBlock.builder().validateModel(
+                            CodeBlock.builder().validateModelBuilder(
                                 properties = paramsProperties,
                                 model = builderClassName,
                                 getModelPropertyFailure = { requiredFieldFailureClassName }

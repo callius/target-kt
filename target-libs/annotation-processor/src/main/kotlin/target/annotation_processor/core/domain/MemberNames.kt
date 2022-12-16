@@ -5,4 +5,5 @@ import com.squareup.kotlinpoet.MemberName
 object MemberNames {
     val flatMap = MemberName("arrow.core", "flatMap")
     val toNonEmptyListOrNull = MemberName("arrow.core", "toNonEmptyListOrNull")
+    val identity = MemberName("arrow.core", "identity")
 }
