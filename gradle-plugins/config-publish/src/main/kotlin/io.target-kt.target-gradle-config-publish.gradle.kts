@@ -28,6 +28,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+            artifact(tasks.named("dokkaJar"))
 
             pom {
                 name.set(propertyString("pom.name"))
