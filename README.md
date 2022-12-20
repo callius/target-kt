@@ -281,8 +281,8 @@ fun updateUser(id: PositiveInt) = repository.update(
 
 ## Roadmap
 
-1. Add generated ModelRequiredField enum and update Buildable signature. Add validation function to params taking
-   optional parameters for true cumulative validation.
+1. Add generated ModelRequiredField enum and update `Buildable` signature. Add validation function to ModelParams taking
+   `Option` parameters for true cumulative validation.
 2. Clean up `ModelTemplate` and other annotations for a more intuitive experience.
 3. Add a configuration property to define the generated timestamp implementation type (currently `java.time.Instant`)
    and support `kotlinx.datetime.Instant` as the new default.
