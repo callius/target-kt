@@ -11,11 +11,6 @@ fun KSAnnotation.nameArgument(): String = arguments.first { it.name!!.asString()
 /**
  * Gets the 'failure' argument from an annotation.
  */
-fun KSAnnotation.failureArgument(): KSType = arguments.first { it.name?.asString() == "failure" }.value as KSType
-
-/**
- * Gets the 'failure' argument from an annotation.
- */
 fun KSAnnotation.idFieldArgument(): KSAnnotation =
     arguments.first { it.name?.asString() == "idField" }.value as KSAnnotation
 

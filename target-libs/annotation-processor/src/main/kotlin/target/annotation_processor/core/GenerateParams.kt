@@ -4,9 +4,7 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.STAR
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
-import target.annotation_processor.core.domain.ModelProperty
-import target.annotation_processor.core.domain.ModelPropertyType
-import target.annotation_processor.core.domain.ModelPropertyTypeArgument
+import target.annotation_processor.core.domain.*
 import target.annotation_processor.core.extension.appendParams
 import target.annotation_processor.core.extension.withNullability
 import target.annotation_processor.core.extension.withTypeArguments
@@ -24,7 +22,8 @@ fun generateParamsSpec(
         modelClassName = modelClassName,
         properties = properties,
         toTypeName = ModelPropertyType::toTypeName,
-        toValueObjectTypeName = ModelPropertyType::toValueObjectTypeName
+        toValueObjectTypeName = ModelPropertyType::toValueObjectTypeName,
+        getModelPropertyFailure = { requiredFieldFailureClassName }
     )
 }
 
@@ -34,6 +33,7 @@ private fun ModelPropertyType.toTypeName(): TypeName {
             type.packageName,
             type.simpleName.appendParams()
         ).withNullability(type.isNullable)
+
         is ModelPropertyType.Standard -> type.withTypeArguments(
             typeArguments.map {
                 when (it) {
@@ -42,16 +42,18 @@ private fun ModelPropertyType.toTypeName(): TypeName {
                 }
             }
         )
+
         is ModelPropertyType.ValueObject -> type
     }
 }
 
 private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
     return when (this) {
-        is ModelPropertyType.ModelTemplate -> ClassName(
-            type.packageName,
-            type.simpleName.appendParams()
+        is ModelPropertyType.ModelTemplate -> eitherOf(
+            nelOf(requiredFieldFailureType),
+            ClassName(type.packageName, type.simpleName.appendParams())
         ).withNullability(type.isNullable)
+
         is ModelPropertyType.Standard -> type.withTypeArguments(
             typeArguments.map {
                 when (it) {
@@ -60,6 +62,7 @@ private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
                 }
             }
         )
+
         is ModelPropertyType.ValueObject -> valueObjectType
     }
 }

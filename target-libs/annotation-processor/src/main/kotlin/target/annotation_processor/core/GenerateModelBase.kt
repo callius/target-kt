@@ -1,13 +1,8 @@
 package target.annotation_processor.core
 
 import com.squareup.kotlinpoet.*
-import target.annotation_processor.core.domain.FunctionNames
-import target.annotation_processor.core.domain.ModelProperty
-import target.annotation_processor.core.domain.ModelPropertyType
-import target.annotation_processor.core.domain.eitherOf
-import target.annotation_processor.core.extension.asFailureReturnType
-import target.annotation_processor.core.extension.ofAndZipConstructor
-import target.annotation_processor.core.extension.rtrn
+import target.annotation_processor.core.domain.*
+import target.annotation_processor.core.extension.validateModel
 
 /**
  * Generates a model data class with the given [properties].
@@ -17,7 +12,8 @@ inline fun generateModelSpecBase(
     modelClassName: ClassName,
     properties: List<ModelProperty>,
     toTypeName: ModelPropertyType.() -> TypeName,
-    toValueObjectTypeName: ModelPropertyType.() -> TypeName
+    toValueObjectTypeName: ModelPropertyType.() -> TypeName,
+    getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
 ): TypeSpec {
     return TypeSpec.classBuilder(modelClassName)
         .addModifiers(KModifier.DATA)
@@ -41,17 +37,12 @@ inline fun generateModelSpecBase(
                             ParameterSpec.builder(it.name, it.type.toValueObjectTypeName()).build()
                         }
                     )
-                    .returns(
-                        eitherOf(
-                            failureClassName.asFailureReturnType(),
-                            modelClassName
-                        )
-                    )
+                    .returns(eitherOf(nelOf(failureClassName), modelClassName))
                     .addCode(
-                        CodeBlock.builder().rtrn().ofAndZipConstructor(
-                            params = properties,
-                            failure = failureClassName,
-                            model = modelClassName
+                        CodeBlock.builder().validateModel(
+                            properties = properties,
+                            model = modelClassName,
+                            getModelPropertyFailure = getModelPropertyFailure
                         ).build()
                     )
                     .build()
