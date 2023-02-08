@@ -12,6 +12,7 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(libs.kotlin.stdlibCommon)
+                implementation(libs.kotlinx.datetime)
                 implementation(project(":target-core"))
             }
         }

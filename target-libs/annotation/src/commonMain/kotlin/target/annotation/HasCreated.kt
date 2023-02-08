@@ -1,6 +1,6 @@
 package target.annotation
 
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Marks a [ModelTemplate] as having a created field. Generated as:
