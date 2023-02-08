@@ -36,6 +36,7 @@ dependencyResolutionManagement {
             library("kotlin-stdlibJs", "org.jetbrains.kotlin", "kotlin-stdlib-js").versionRef("kotlin")
             library("kotlinpoet", "com.squareup", "kotlinpoet").versionRef("kotlinpoet")
             library("kotlinpoet-ksp", "com.squareup", "kotlinpoet-ksp").versionRef("kotlinpoet")
+            library("kotlinx-datetime", "org.jetbrains.kotlinx", "kotlinx-datetime").version("0.4.0")
             library("ksp", "com.google.devtools.ksp", "symbol-processing-api").versionRef("ksp")
 
             plugin("dokka", "org.jetbrains.dokka").version("1.7.20")

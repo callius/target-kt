@@ -6,5 +6,5 @@ package target.annotation
 @HasUpdated
 @HasCreated
 @Target(AnnotationTarget.CLASS)
-@Retention(AnnotationRetention.RUNTIME)
-annotation class HasCreatedAndUpdated()
+@Retention(AnnotationRetention.SOURCE)
+annotation class HasCreatedAndUpdated

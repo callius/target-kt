@@ -1,7 +1,5 @@
 package target.annotation
 
-import target.core.valueobject.PositiveInt
-
 /**
  * Marks an interface as a model template.
  *
@@ -15,6 +13,8 @@ import target.core.valueobject.PositiveInt
 @Retention(AnnotationRetention.SOURCE)
 annotation class ModelTemplate(
     val name: String,
+    // TODO: Remove these properties.
+    //  Update readme: update EmailAddress & valueobject removal, add Gradle usage section, update roadmap.
     val idField: AddField = AddField(name = "id", type = PositiveInt::class),
     val customId: Boolean = false
 )
