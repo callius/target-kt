@@ -6,12 +6,14 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+# Project artifact configurations
+/artifacts/
 # Project files
+/.name
+/compiler.xml
 /misc.xml
 /modules.xml
-/target-kt.iml
 /gradle.xml
 /jarRepositories.xml
-/compiler.xml
 /kotlinc.xml
-/.name
+/target-kt.iml
