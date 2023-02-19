@@ -21,9 +21,10 @@ interface ValueFailure<T> {
 
 #### Value Object
 
-A `ValueObject` is an interface representing a validated value. By convention, value objects have a private primary
-constructor, so that they are not instantiated outside a `ValueValidator`. A value object implementation must declare a
-companion object implementing a value validator when used in conjunction with the annotation processor library.
+A `ValueObject` is an interface representing a validated value. By convention, value object implementations have a
+private primary constructor, so that they are not instantiated outside a `ValueValidator`. A value object implementation
+must declare a companion object implementing a value validator when used in conjunction with the annotation processor
+library.
 
 ```kotlin
 interface ValueObject<T> {
@@ -67,7 +68,8 @@ abstract class StringInRegexValidator<T : ValueObject<String>>(private val ctor:
 }
 ```
 
-The included `EmailAddress` class is an example of a `ValueObject` implementation.
+Value object classes can be inlined on the JVM. This `EmailAddress` class is an example of such a `ValueObject`
+implementation.
 
 ```kotlin
 /**
@@ -76,21 +78,29 @@ The included `EmailAddress` class is an example of a `ValueObject` implementatio
 @JvmInline
 value class EmailAddress private constructor(override val value: String) : ValueObject<String> {
 
-    companion object : StringInRegexValidator<EmailAddress>(::EmailAddress) {
+    companion object : EmailAddressValidator<EmailAddress>(::EmailAddress)
+}
+```
 
-        override val regex by lazy {
-            Regex(
-                """^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$"""
-            )
-        }
-    }
+This value object can then be used to validate an email address like so:
+
+```kotlin
+suspend fun createUser(params: UserParamsDto) = either {
+    val emailAddress = EmailAddress.of(params.emailAddress).bind()
+    // ... validating other params ...
+    repositoryCreate(
+        UserParams(
+            emailAddress = emailAddress
+            // ... passing other validated params ...
+        )
+    ).bind()
 }
 ```
 
 ## Annotation Processor
 
-The Target annotation processor library takes the properties of a model template interface and generates four main
-classes: failure, model, params, and builder.
+The Target annotation processor library makes it easy to create functionally validated models. It takes the properties
+of a model template interface and generates four main classes: failure, model, params, and builder.
 
 #### Failure
 
@@ -156,11 +166,67 @@ data class ModelBuilder(/* ... */) : Buildable<ModelParams> {
 }
 ```
 
+### Adding Fields
+
+Fields can be added not only by declaring them on the model template interface, but also via the `AddField` annotation.
+Fields added with this annotation are external by default.
+
+```kotlin
+@AddField("id", PositiveInt::class)
+@ModelTemplate("Test")
+interface TestModel {
+    /** ... */
+}
+```
+
+Is equivalent to:
+
+```kotlin
+@ModelTemplate("Test")
+interface TestModel {
+
+    @External
+    val id: PositiveInt
+
+    /** ... */
+}
+```
+
+The `AddField` annotation is intended to only be used for composition and should not be added to the model template
+interface directly. This may be enforced in the future by changing its `@Target` to `AnnotationTarget.ANNOTATION_CLASS`.
+To use it properly, add it to a new annotation and use the newly-created annotation instead.
+
+```kotlin
+@AddField("id", PositiveInt::class)
+annotation class HasPositiveIntId
+
+// ...
+
+@HasPositiveIntId
+@ModelTemplate("Test")
+interface TestModel {
+    /** ... */
+}
+```
+
+This is also how the included `HasCreated` and `HasCreatedAndUpdated` annotations work internally.
+
+```kotlin
+@AddField(name = "created", type = Instant::class)
+annotation class HasCreated
+```
+
+```kotlin
+@HasUpdated
+@HasCreated
+annotation class HasCreatedAndUpdated
+```
+
 ### Nested Models
 
 Nested models are a developing feature. A nested model property is defined just like any other property, with the type
-of its model interface. If the nested model is part of another domain and will be dynamically populated, e.g., by a
-repository, annotate it with `@External`.
+of its model template interface. If the nested model is part of another domain and will be dynamically populated, e.g.,
+by a repository, annotate it with `@External`.
 
 ```kotlin
 @ModelTemplate("Test")
@@ -180,7 +246,7 @@ interface TestChildModel {
 #### Limitations
 
 Nullable nested internal models are not easily updatable using the generated builder class, and are thus not
-recommended. In this example:
+recommended. In this example, notice the absence of `@External`:
 
 ```kotlin
 @ModelTemplate("Test")
@@ -190,7 +256,7 @@ interface TestModel {
     val child: TestChildModel?
 }
 
-@ModelTemplate("TestChild", customId = true)
+@ModelTemplate("TestChild")
 interface TestChildModel {
     /** ... */
 }
@@ -209,7 +275,7 @@ data class TestBuilder(
 Now, there are two conflicting use cases:
 
 1. When the intent is to update `TestChild`, but `Test.child` is null.
-2. When the intent is to create `TestChild`, but `TestBuilder.child` is not buildable to params.
+2. When the intent is to create `TestChild`, but `TestBuilder.child` is not buildable to `TestChildParams`.
 
 There is a consideration to update the generated field to something like:
 
@@ -224,6 +290,7 @@ This would encompass the desired delete, update, and create use cases.
 Define a model template interface:
 
 ```kotlin
+@HasPositiveIntId
 @HasCreatedAndUpdated
 @ModelTemplate("User")
 interface UserModel {
@@ -237,7 +304,7 @@ interface UserModel {
 }
 
 @HasCreatedAndUpdated
-@ModelTemplate("UserPhoneNumber", customId = true)
+@ModelTemplate("UserPhoneNumber")
 interface UserPhoneNumberModel {
     val userId: PositiveInt
     val number: PhoneNumber
@@ -279,11 +346,35 @@ fun updateUser(id: PositiveInt) = repository.update(
 )
 ```
 
+## Gradle Setup
+
+> Note that these libraries are experimental, and their APIs are subject to change.
+
+#### Target Core
+
+```kotlin
+dependencies {
+    implementation("io.target-kt:target-core:$targetVersion")
+}
+```
+
+#### Target Core + Annotation Processor
+
+```kotlin
+plugins {
+    id("com.google.devtools.ksp") version kspVersion
+}
+
+dependencies {
+    implementation("io.target-kt:target-core:$targetVersion")
+    compileOnly("io.target-kt:target-annotation:$targetVersion")
+    ksp("io.target-kt:target-annotation-processor:$targetVersion")
+}
+```
+
+See the [KSP docs](https://kotlinlang.org/docs/ksp-overview.html) for additional configuration details.
+
 ## Roadmap
 
-1. Add generated ModelRequiredField enum and update `Buildable` signature. Add validation function to ModelParams taking
-   `Option` parameters for true cumulative validation.
-2. Clean up `ModelTemplate` and other annotations for a more intuitive experience.
-3. Add a configuration property to define the generated timestamp implementation type (currently `java.time.Instant`)
-   and support `kotlinx.datetime.Instant` as the new default.
-4. Support Kotlin Multiplatform.
+1. Add generated `ModelRequiredField` enum and update `Buildable` interface signature. Add validation function to
+   ModelParams taking `Option` parameters for validation without an intermediate builder.
