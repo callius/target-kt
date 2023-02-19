@@ -48,8 +48,6 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
         // Parsing model template annotation.
         val modelTemplate = classDeclaration.annotations.first(::annotationShortNameEqualsModelTemplate)
         val className = modelTemplate.nameArgument()
-        val idField = modelTemplate.idFieldArgument()
-        val customId = modelTemplate.customIdArgument()
 
         // Creating class names.
         val fieldFailureName = className.appendFieldFailure()
@@ -64,7 +62,6 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
         val modelProperties = generateModelProperties(
             properties = properties,
             addFieldAnnotations = classDeclaration.annotations.findAddFields(),
-            addFieldId = if (customId) null else idField,
             fieldFailureClassName
         )
 
@@ -121,15 +118,9 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
     private fun generateModelProperties(
         properties: List<KSPropertyDeclaration>,
         addFieldAnnotations: List<KSAnnotation>,
-        addFieldId: KSAnnotation?,
         fieldFailureClassName: ClassName
     ): List<ModelProperty> {
         return buildList {
-            // Adding id property.
-            if (addFieldId != null) {
-                add(addFieldId.toModelProperty(fieldFailureClassName))
-            }
-
             // Adding defined properties.
             properties.forEach { add(it.toModelProperty(fieldFailureClassName)) }
 
