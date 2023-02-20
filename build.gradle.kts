@@ -15,10 +15,4 @@ allprojects {
     }
 
     apply(plugin = dokkaPluginId)
-    tasks.create("dokkaJar", Jar::class) {
-        val javadocClassifier = "javadoc"
-        archiveClassifier.convention(javadocClassifier)
-        archiveClassifier.set(javadocClassifier)
-        from(tasks.named("dokkaJavadoc"))
-    }
 }

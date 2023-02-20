@@ -11,5 +11,5 @@ import kotlinx.datetime.Instant
  */
 @AddField(name = "updated", type = Instant::class)
 @Target(AnnotationTarget.CLASS)
-@Retention(AnnotationRetention.SOURCE)
+@Retention(AnnotationRetention.BINARY)
 annotation class HasUpdated

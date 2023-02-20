@@ -6,5 +6,5 @@ package target.annotation
 @HasUpdated
 @HasCreated
 @Target(AnnotationTarget.CLASS)
-@Retention(AnnotationRetention.SOURCE)
+@Retention(AnnotationRetention.BINARY)
 annotation class HasCreatedAndUpdated
