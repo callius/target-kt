@@ -9,17 +9,6 @@ import com.google.devtools.ksp.symbol.KSType
 fun KSAnnotation.nameArgument(): String = arguments.first { it.name!!.asString() == "name" }.value as String
 
 /**
- * Gets the 'failure' argument from an annotation.
- */
-fun KSAnnotation.idFieldArgument(): KSAnnotation =
-    arguments.first { it.name?.asString() == "idField" }.value as KSAnnotation
-
-/**
- * Gets the 'customId' argument from an annotation.
- */
-fun KSAnnotation.customIdArgument(): Boolean = arguments.first { it.name?.asString() == "customId" }.value as Boolean
-
-/**
  * Gets the 'type' argument from an annotation.
  */
 fun KSAnnotation.typeArgument(): KSType = arguments.first { it.name?.asString() == "type" }.value as KSType

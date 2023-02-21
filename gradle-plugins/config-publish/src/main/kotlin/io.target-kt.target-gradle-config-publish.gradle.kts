@@ -7,6 +7,13 @@ plugins {
 
 fun propertyString(propertyName: String) = property(propertyName).toString()
 
+val javadocJar by tasks.registering(Jar::class) {
+    val dokkaHtmlProvider = tasks.named("dokkaGfm")
+    dependsOn(dokkaHtmlProvider)
+    archiveClassifier.set("javadoc")
+    from(dokkaHtmlProvider.get().property("outputDirectory"))
+}
+
 publishing {
     repositories {
         maven {
@@ -26,35 +33,16 @@ publishing {
         }
     }
     publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-            artifact(tasks.named("dokkaJar"))
-
-            pom {
-                name.set(propertyString("pom.name"))
-                description.set(propertyString("pom.description"))
-                url.set(propertyString("pom.url"))
-
-                licenses {
-                    license {
-                        name.set(propertyString("pom.license.name"))
-                        url.set(propertyString("pom.license.url"))
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set(propertyString("pom.developer.id"))
-                        name.set(propertyString("pom.developer.name"))
-                        email.set(propertyString("pom.developer.email"))
-                    }
-                }
-
-                scm {
-                    connection.set(propertyString("pom.scm.connection"))
-                    developerConnection.set(propertyString("pom.scm.developerConnection"))
-                    url.set(propertyString("pom.scm.url"))
-                }
+        if (isKotlinMultiplatform) {
+            withType<MavenPublication> {
+                artifact(javadocJar)
+                configurePom()
+            }
+        } else {
+            create<MavenPublication>("maven") {
+                from(components["java"])
+                artifact(javadocJar)
+                configurePom()
             }
         }
     }
@@ -62,4 +50,36 @@ publishing {
 
 signing {
     sign(publishing.publications)
+}
+
+internal val Project.isKotlinMultiplatform: Boolean
+    get() = pluginManager.hasPlugin("org.jetbrains.kotlin.multiplatform")
+
+fun MavenPublication.configurePom() {
+    pom {
+        name.set(propertyString("pom.name"))
+        description.set(propertyString("pom.description"))
+        url.set(propertyString("pom.url"))
+
+        licenses {
+            license {
+                name.set(propertyString("pom.license.name"))
+                url.set(propertyString("pom.license.url"))
+            }
+        }
+
+        developers {
+            developer {
+                id.set(propertyString("pom.developer.id"))
+                name.set(propertyString("pom.developer.name"))
+                email.set(propertyString("pom.developer.email"))
+            }
+        }
+
+        scm {
+            connection.set(propertyString("pom.scm.connection"))
+            developerConnection.set(propertyString("pom.scm.developerConnection"))
+            url.set(propertyString("pom.scm.url"))
+        }
+    }
 }

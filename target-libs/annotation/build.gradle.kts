@@ -1,15 +1,30 @@
 @Suppress("DSL_SCOPE_VIOLATION")
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.multiplatform)
+    id("io.target-kt.target-gradle-config-kotlin")
     id("io.target-kt.target-gradle-config-publish")
 }
 
 version = libs.versions.target.get()
 
-java {
-    withSourcesJar()
-}
-
-dependencies {
-    implementation(project(":target-core"))
+kotlin {
+    sourceSets {
+        commonMain {
+            dependencies {
+                implementation(libs.kotlin.stdlibCommon)
+                implementation(libs.kotlinx.datetime)
+                implementation(project(":target-core"))
+            }
+        }
+        jvmMain {
+            dependencies {
+                implementation(libs.kotlin.stdlibJdk8)
+            }
+        }
+        jsMain {
+            dependencies {
+                implementation(libs.kotlin.stdlibJs)
+            }
+        }
+    }
 }

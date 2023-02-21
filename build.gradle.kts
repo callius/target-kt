@@ -3,6 +3,7 @@
 plugins {
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
 }
 
 val dokkaPluginId = libs.plugins.dokka.get().pluginId
@@ -14,10 +15,4 @@ allprojects {
     }
 
     apply(plugin = dokkaPluginId)
-    tasks.create("dokkaJar", Jar::class) {
-        val javadocClassifier = "javadoc"
-        archiveClassifier.convention(javadocClassifier)
-        archiveClassifier.set(javadocClassifier)
-        from(tasks.named("dokkaJavadoc"))
-    }
 }
