@@ -22,6 +22,7 @@ dependencyResolutionManagement {
         create("libs") {
             version("target", extra["target.version"].toString())
 
+            // TODO: Upgrade dependencies.
             version("kotlin", "1.7.21")
             version("arrow", "1.1.3")
             version("junit", "5.8.1")
