@@ -40,7 +40,6 @@ if (isKotlinMultiplatform) {
 
         mingwX64()
 
-        iosArm32()
         iosArm64()
         iosSimulatorArm64()
         iosX64()
@@ -53,13 +52,11 @@ if (isKotlinMultiplatform) {
         watchosArm64()
         watchosSimulatorArm64()
         watchosX64()
-        watchosX86()
 
         sourceSets {
             val commonMain by getting
             val mingwX64Main by getting
             val linuxX64Main by getting
-            val iosArm32Main by getting
             val iosArm64Main by getting
             val iosSimulatorArm64Main by getting
             val iosX64Main by getting
@@ -72,13 +69,11 @@ if (isKotlinMultiplatform) {
             val watchosArm64Main by getting
             val watchosSimulatorArm64Main by getting
             val watchosX64Main by getting
-            val watchosX86Main by getting
 
             create("nativeMain") {
                 dependsOn(commonMain)
                 mingwX64Main.dependsOn(this)
                 linuxX64Main.dependsOn(this)
-                iosArm32Main.dependsOn(this)
                 iosArm64Main.dependsOn(this)
                 iosSimulatorArm64Main.dependsOn(this)
                 iosX64Main.dependsOn(this)
@@ -91,7 +86,6 @@ if (isKotlinMultiplatform) {
                 watchosArm64Main.dependsOn(this)
                 watchosSimulatorArm64Main.dependsOn(this)
                 watchosX64Main.dependsOn(this)
-                watchosX86Main.dependsOn(this)
             }
         }
     }
