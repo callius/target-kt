@@ -1,3 +1,15 @@
+## 0.4.0
+
+Feature:
+
+- Kotlin 1.9.0
+- KSP 1.9.0-1.0.11
+- Arrow 1.1.5
+
+Breaking:
+
+- Changed enum value object validators to accept new `entries` property instead of `values` getter.
+
 ## 0.3.0
 
 Feature:
