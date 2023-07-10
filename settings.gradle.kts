@@ -22,11 +22,11 @@ dependencyResolutionManagement {
         create("libs") {
             version("target", extra["target.version"].toString())
 
-            version("kotlin", "1.7.21")
-            version("arrow", "1.1.3")
-            version("junit", "5.8.1")
-            version("kotlinpoet", "1.12.0")
-            version("ksp", "1.7.21-1.0.8")
+            version("kotlin", "1.9.0")
+            version("arrow", "1.1.5")
+            version("junit", "5.9.3")
+            version("kotlinpoet", "1.14.2")
+            version("ksp", "1.9.0-1.0.11")
 
             library("arrow-core", "io.arrow-kt", "arrow-core").versionRef("arrow")
             library("junitJupiterApi", "org.junit.jupiter", "junit-jupiter-api").versionRef("junit")
@@ -39,7 +39,7 @@ dependencyResolutionManagement {
             library("kotlinx-datetime", "org.jetbrains.kotlinx", "kotlinx-datetime").version("0.4.0")
             library("ksp", "com.google.devtools.ksp", "symbol-processing-api").versionRef("ksp")
 
-            plugin("dokka", "org.jetbrains.dokka").version("1.7.20")
+            plugin("dokka", "org.jetbrains.dokka").version("1.8.20")
             plugin("kotlin-jvm", "org.jetbrains.kotlin.jvm").versionRef("kotlin")
             plugin("kotlin-multiplatform", "org.jetbrains.kotlin.multiplatform").versionRef("kotlin")
         }
