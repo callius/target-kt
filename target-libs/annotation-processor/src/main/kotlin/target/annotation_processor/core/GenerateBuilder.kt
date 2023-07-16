@@ -12,15 +12,9 @@ fun generateBuilderSpec(
     builderClassName: ClassName,
     paramsClassName: ClassName,
     paramsProperties: List<ModelProperty>,
+    validationFunctions: List<ValidationFunction>
 ): TypeSpec {
-    val optionParams = paramsProperties.map {
-        it.copy(
-            type = ModelPropertyType.Standard(
-                ClassNames.option,
-                typeArguments = listOf(ModelPropertyTypeArgument.Type(it.type))
-            )
-        )
-    }
+    val optionParams = paramsProperties.mapOptionPropertyType()
 
     return TypeSpec.classBuilder(builderClassName)
         .addModifiers(KModifier.DATA)
@@ -65,6 +59,27 @@ fun generateBuilderSpec(
                         )
                         .build()
                 )
+                .apply {
+                    validationFunctions.forEach { function ->
+                        addFunction(
+                            FunSpec.builder(function.name)
+                                .addParameters(
+                                    function.properties.mapOptionPropertyType().map {
+                                        ParameterSpec.builder(it.name, it.type.toValueObjectTypeName()).build()
+                                    }
+                                )
+                                .returns(eitherOf(nelOf(failureClassName), builderClassName))
+                                .addCode(
+                                    CodeBlock.builder().validateModelBuilder(
+                                        properties = function.properties,
+                                        model = builderClassName,
+                                        getModelPropertyFailure = { requiredFieldFailureClassName }
+                                    ).build()
+                                )
+                                .build()
+                        )
+                    }
+                }
                 .addFunction(
                     FunSpec.builder(FunctionNames.only)
                         .addParameters(
@@ -88,6 +103,14 @@ fun generateBuilderSpec(
         .build()
 }
 
+private fun List<ModelProperty>.mapOptionPropertyType() = map {
+    it.copy(
+        type = ModelPropertyType.Standard(
+            ClassNames.option,
+            typeArguments = listOf(ModelPropertyTypeArgument.Type(it.type))
+        )
+    )
+}
 
 private fun ModelPropertyType.toTypeName(): TypeName {
     return when (this) {

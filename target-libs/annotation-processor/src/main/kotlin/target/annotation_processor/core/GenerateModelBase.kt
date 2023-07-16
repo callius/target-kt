@@ -11,6 +11,7 @@ inline fun generateModelSpecBase(
     failureClassName: ClassName,
     modelClassName: ClassName,
     properties: List<ModelProperty>,
+    validationFunctions: List<ValidationFunction>,
     toTypeName: ModelPropertyType.() -> TypeName,
     toValueObjectTypeName: ModelPropertyType.() -> TypeName,
     getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
@@ -30,23 +31,46 @@ inline fun generateModelSpecBase(
             }
         )
         .addType(
-            TypeSpec.companionObjectBuilder().addFunction(
-                FunSpec.builder(FunctionNames.of)
-                    .addParameters(
-                        properties.map {
-                            ParameterSpec.builder(it.name, it.type.toValueObjectTypeName()).build()
-                        }
-                    )
-                    .returns(eitherOf(nelOf(failureClassName), modelClassName))
-                    .addCode(
-                        CodeBlock.builder().validateModel(
-                            properties = properties,
-                            model = modelClassName,
-                            getModelPropertyFailure = getModelPropertyFailure
-                        ).build()
-                    )
-                    .build()
-            ).build()
+            TypeSpec.companionObjectBuilder()
+                .addFunction(
+                    FunSpec.builder(FunctionNames.of)
+                        .addParameters(
+                            properties.map {
+                                ParameterSpec.builder(it.name, it.type.toValueObjectTypeName()).build()
+                            }
+                        )
+                        .returns(eitherOf(nelOf(failureClassName), modelClassName))
+                        .addCode(
+                            CodeBlock.builder().validateModel(
+                                properties = properties,
+                                model = modelClassName,
+                                getModelPropertyFailure = getModelPropertyFailure
+                            ).build()
+                        )
+                        .build()
+                )
+                .apply {
+                    validationFunctions.forEach { function ->
+                        addFunction(
+                            FunSpec.builder(function.name)
+                                .addParameters(
+                                    function.properties.map {
+                                        ParameterSpec.builder(it.name, it.type.toValueObjectTypeName()).build()
+                                    }
+                                )
+                                .returns(eitherOf(nelOf(failureClassName), modelClassName))
+                                .addCode(
+                                    CodeBlock.builder().validateModel(
+                                        properties = function.properties,
+                                        model = modelClassName,
+                                        getModelPropertyFailure = getModelPropertyFailure
+                                    ).build()
+                                )
+                                .build()
+                        )
+                    }
+                }
+                .build()
         )
         .build()
 }

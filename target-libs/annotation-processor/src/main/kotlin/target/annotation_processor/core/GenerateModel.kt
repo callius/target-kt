@@ -14,12 +14,14 @@ import target.annotation_processor.core.extension.withTypeArguments
 fun generateModelSpec(
     failureClassName: ClassName,
     modelClassName: ClassName,
-    properties: List<ModelProperty>
+    properties: List<ModelProperty>,
+    validationFunctions: List<ValidationFunction>
 ): TypeSpec {
     return generateModelSpecBase(
         failureClassName = failureClassName,
         modelClassName = modelClassName,
         properties = properties,
+        validationFunctions = validationFunctions,
         toTypeName = ModelPropertyType::toTypeName,
         toValueObjectTypeName = ModelPropertyType::toValueObjectTypeName,
         getModelPropertyFailure = { fieldFailureClassName }

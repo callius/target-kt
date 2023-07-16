@@ -1,5 +1,6 @@
 package target.annotation_processor
 
+import com.google.devtools.ksp.isPrivate
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
@@ -23,6 +24,10 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
     companion object {
 
         private const val modelTemplateSimpleName = "ModelTemplate"
+        private const val validationTemplateSimpleName = "ValidationTemplate"
+        private const val modelValidationTemplateSimpleName = "ModelValidationTemplate"
+        private const val paramsValidationTemplateSimpleName = "ParamsValidationTemplate"
+        private const val builderValidationTemplateSimpleName = "BuilderValidationTemplate"
 
         private const val valueValidatorFailureTypeParameterIndex = 1
 
@@ -64,6 +69,8 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
             addFieldAnnotations = classDeclaration.annotations.findAddFields(),
             fieldFailureClassName
         )
+        val (modelValidationFunctions, paramsValidationFunctions, builderValidationFunctions) =
+            generateValidationFunctions(classDeclaration, modelProperties)
 
         // Creating params and builder properties.
         val paramsProperties = modelProperties.filter { it.isNotExternal }
@@ -87,7 +94,8 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                 generateModelSpec(
                     failureClassName = fieldFailureClassName,
                     modelClassName = ClassName(packageName, className),
-                    properties = modelProperties
+                    properties = modelProperties,
+                    validationFunctions = modelValidationFunctions
                 )
             ),
             generateFileSpec(
@@ -96,7 +104,8 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                 generateParamsSpec(
                     failureClassName = requiredFieldFailureClassName,
                     modelClassName = paramsClassName,
-                    properties = paramsProperties
+                    properties = paramsProperties,
+                    validationFunctions = paramsValidationFunctions
                 )
             ),
             generateFileSpec(
@@ -107,6 +116,7 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                     builderClassName = ClassName(packageName, builderName),
                     paramsClassName = paramsClassName,
                     paramsProperties = paramsProperties,
+                    validationFunctions = builderValidationFunctions
                 )
             )
         )
@@ -127,6 +137,76 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
             // Adding properties defined by AddField annotations.
             addFieldAnnotations.forEach { add(it.toModelProperty(fieldFailureClassName)) }
         }
+    }
+
+    /**
+     * Generates additional validation functions for declared validation templates.
+     */
+    private fun generateValidationFunctions(
+        classDeclaration: KSClassDeclaration,
+        classProperties: List<ModelProperty>
+    ): Triple<List<ValidationFunction>, List<ValidationFunction>, List<ValidationFunction>> {
+        val model = mutableListOf<ValidationFunction>()
+        val params = mutableListOf<ValidationFunction>()
+        val builder = mutableListOf<ValidationFunction>()
+
+        classDeclaration.declarations.filterIsInstance<KSClassDeclaration>().forEach { subClass ->
+            subClass.annotations.firstOrNull {
+                when (it.shortName.asString()) {
+                    validationTemplateSimpleName,
+                    modelValidationTemplateSimpleName,
+                    paramsValidationTemplateSimpleName,
+                    builderValidationTemplateSimpleName -> true
+
+                    else -> false
+                }
+            }?.let {
+                if (subClass.classKind != ClassKind.INTERFACE || !subClass.isPrivate()) {
+                    logger.warn("Target annotated with $validationTemplateSimpleName is not a private interface")
+                }
+
+                val validationFunction = generateValidationFunction(it.nameArgument(), classProperties, subClass)
+                when (it.shortName.asString()) {
+                    validationTemplateSimpleName -> {
+                        model.add(validationFunction)
+                        params.add(validationFunction)
+                        builder.add(validationFunction)
+                    }
+
+                    modelValidationTemplateSimpleName -> model.add(validationFunction)
+                    paramsValidationTemplateSimpleName -> params.add(validationFunction)
+                    builderValidationTemplateSimpleName -> builder.add(validationFunction)
+                }
+            }
+        }
+
+        return Triple(model, params, builder)
+    }
+
+    /**
+     * Generates a validation function.
+     */
+    private fun generateValidationFunction(
+        name: String,
+        classProperties: List<ModelProperty>,
+        subClass: KSClassDeclaration
+    ): ValidationFunction {
+        val subClassProperties = subClass.getAllProperties().filter { it.validate() }
+        return ValidationFunction(
+            name = name,
+            properties = classProperties.map { modelProperty ->
+                if (modelProperty.type is ModelPropertyType.ValueObject && subClassProperties.any { it.simpleName.asString() == modelProperty.name }) {
+                    modelProperty.copy(
+                        type = ModelPropertyType.Standard(
+                            type = modelProperty.type.type,
+                            typeArguments = emptyList()
+                        )
+                    )
+                } else {
+                    modelProperty
+                }
+            }
+        )
     }
 
     /**
