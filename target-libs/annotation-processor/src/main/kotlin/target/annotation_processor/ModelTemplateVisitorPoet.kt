@@ -69,11 +69,17 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
             addFieldAnnotations = classDeclaration.annotations.findAddFields(),
             fieldFailureClassName
         )
-        val (modelValidationFunctions, paramsValidationFunctions, builderValidationFunctions) =
-            generateValidationFunctions(classDeclaration, modelProperties)
 
         // Creating params and builder properties.
         val paramsProperties = modelProperties.filter { it.isNotExternal }
+
+        // Generating validation functions.
+        val (modelValidationFunctions, paramsValidationFunctions, builderValidationFunctions) =
+            generateValidationFunctions(
+                classDeclaration,
+                modelProperties = modelProperties,
+                paramsProperties = paramsProperties
+            )
 
         // Generating files.
         writeFileSpecList(
@@ -144,7 +150,8 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
      */
     private fun generateValidationFunctions(
         classDeclaration: KSClassDeclaration,
-        classProperties: List<ModelProperty>
+        modelProperties: List<ModelProperty>,
+        paramsProperties: List<ModelProperty>
     ): Triple<List<ValidationFunction>, List<ValidationFunction>, List<ValidationFunction>> {
         val model = mutableListOf<ValidationFunction>()
         val params = mutableListOf<ValidationFunction>()
@@ -165,17 +172,27 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                     logger.warn("Target annotated with $validationTemplateSimpleName is not a private interface")
                 }
 
-                val validationFunction = generateValidationFunction(it.nameArgument(), classProperties, subClass)
+                val functionName = it.nameArgument()
                 when (it.shortName.asString()) {
                     validationTemplateSimpleName -> {
-                        model.add(validationFunction)
-                        params.add(validationFunction)
-                        builder.add(validationFunction)
+                        model.add(generateValidationFunction(functionName, modelProperties, subClass))
+
+                        val paramsFunction = generateValidationFunction(functionName, paramsProperties, subClass)
+                        params.add(paramsFunction)
+                        builder.add(paramsFunction)
                     }
 
-                    modelValidationTemplateSimpleName -> model.add(validationFunction)
-                    paramsValidationTemplateSimpleName -> params.add(validationFunction)
-                    builderValidationTemplateSimpleName -> builder.add(validationFunction)
+                    modelValidationTemplateSimpleName -> model.add(
+                        generateValidationFunction(functionName, modelProperties, subClass)
+                    )
+
+                    paramsValidationTemplateSimpleName -> params.add(
+                        generateValidationFunction(functionName, paramsProperties, subClass)
+                    )
+
+                    builderValidationTemplateSimpleName -> builder.add(
+                        generateValidationFunction(functionName, paramsProperties, subClass)
+                    )
                 }
             }
         }
@@ -191,7 +208,8 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
         classProperties: List<ModelProperty>,
         subClass: KSClassDeclaration
     ): ValidationFunction {
-        val subClassProperties = subClass.getAllProperties().filter { it.validate() }
+        val subClassProperties =
+            subClass.getAllProperties().filter { it.validate() && it.modifiers.contains(Modifier.OVERRIDE) }
         return ValidationFunction(
             name = name,
             properties = classProperties.map { modelProperty ->
