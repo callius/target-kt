@@ -178,6 +178,9 @@ fun CodeBlock.Builder.validateModelTemplates(properties: List<TypedModelProperty
 
 fun CodeBlock.Builder.validateModelTemplatesOption(properties: List<TypedModelProperty>) = properties.forEach {
     if (it is TypedModelProperty.ModelTemplate) {
+        // TODO: Traverse is deprecated. Replace with:
+        //  .fold({ Either.Right(None) }, { it.map(::Some) }) and
+        //  .fold({ Either.Right(None) }, { it?.map(::Some) ?: Either.Right(Some(null)) })
         if (it.type.type.isNullable) {
             addStatement("val ${it.property.vName} = ${it.property.name}.traverse { it ?: %T(null) }", ClassNames.right)
         } else {

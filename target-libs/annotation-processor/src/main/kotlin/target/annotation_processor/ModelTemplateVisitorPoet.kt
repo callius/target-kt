@@ -22,23 +22,23 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
 
     companion object {
 
-        private const val modelTemplateSimpleName = "ModelTemplate"
+        private const val MODEL_TEMPLATE_SIMPLE_NAME = "ModelTemplate"
 
-        private const val valueValidatorFailureTypeParameterIndex = 1
+        private const val VALUE_VALIDATOR_FAILURE_TYPE_PARAMETER_INDEX = 1
 
         private fun annotationShortNameEqualsModelTemplate(annotation: KSAnnotation) =
-            annotation.shortName.asString() == modelTemplateSimpleName
+            annotation.shortName.asString() == MODEL_TEMPLATE_SIMPLE_NAME
     }
 
     override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Unit) {
         if (classDeclaration.classKind != ClassKind.INTERFACE) {
-            logger.error("Only interfaces can be annotated with @$modelTemplateSimpleName", classDeclaration)
+            logger.error("Only interfaces can be annotated with @$MODEL_TEMPLATE_SIMPLE_NAME", classDeclaration)
             return
         }
 
         val properties = classDeclaration.getAllProperties().filter { it.validate() }.toList()
         if (properties.isEmpty()) {
-            logger.error("Interface annotated with @$modelTemplateSimpleName must declare at least one property.")
+            logger.error("Interface annotated with @$MODEL_TEMPLATE_SIMPLE_NAME must declare at least one property.")
             return
         }
 
@@ -94,7 +94,6 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                 packageName = packageName,
                 fileName = paramsName,
                 generateParamsSpec(
-                    failureClassName = requiredFieldFailureClassName,
                     modelClassName = paramsClassName,
                     properties = paramsProperties
                 )
@@ -103,9 +102,7 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                 packageName = packageName,
                 fileName = builderName,
                 generateBuilderSpec(
-                    failureClassName = requiredFieldFailureClassName,
                     builderClassName = ClassName(packageName, builderName),
-                    paramsClassName = paramsClassName,
                     paramsProperties = paramsProperties,
                 )
             )
@@ -284,7 +281,7 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                 ?: error("Failed to resolve value validator failure type: companion object does not inherit value validator")
         } else {
             val failureTypeReference =
-                valueValidator.first.element!!.typeArguments[valueValidatorFailureTypeParameterIndex].type!!
+                valueValidator.first.element!!.typeArguments[VALUE_VALIDATOR_FAILURE_TYPE_PARAMETER_INDEX].type!!
             val failureType = resolveTypeReference(failureTypeReference)
             resolveTypeName(
                 failureTypeReference,

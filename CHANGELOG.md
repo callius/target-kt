@@ -1,3 +1,15 @@
+## 0.5.0
+
+Feature:
+
+- Kotlin 1.9.21
+- KSP 1.9.21-1.0.15
+- Arrow 1.2.0
+
+Breaking:
+
+- 
+
 ## 0.4.0
 
 Feature:
