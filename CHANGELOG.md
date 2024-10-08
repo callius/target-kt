@@ -2,9 +2,11 @@
 
 Feature:
 
-- Kotlin 1.9.21
-- KSP 1.9.21-1.0.15
+- Kotlin 2.0.20
+- KSP 2.0.20-1.0.25
 - Arrow 1.2.0
+- Kotlinx-Datetime 0.6.0
+- Dokka 1.9.20
 
 Breaking:
 
