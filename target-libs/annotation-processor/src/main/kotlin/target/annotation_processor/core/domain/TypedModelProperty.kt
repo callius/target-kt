@@ -38,4 +38,10 @@ sealed interface TypedModelProperty {
         val type: ModelPropertyType.ModelTemplate,
         override val validatedName: String
     ) : TypedModelProperty
+
+    class ModelTemplateOption(
+        override val property: ModelProperty,
+        val type: ModelPropertyType.ModelTemplateOption,
+        override val validatedName: String
+    ) : TypedModelProperty
 }

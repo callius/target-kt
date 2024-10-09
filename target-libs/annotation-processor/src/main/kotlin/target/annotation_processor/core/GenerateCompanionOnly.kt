@@ -4,6 +4,7 @@ import com.squareup.kotlinpoet.*
 import target.annotation_processor.core.domain.*
 import target.annotation_processor.core.extension.constructorCall
 import target.annotation_processor.core.extension.rtrn
+import target.annotation_processor.core.extension.withNullability
 import target.annotation_processor.core.extension.withTypeArguments
 
 fun generateCompanionOnlySpec(
@@ -20,7 +21,8 @@ fun generateCompanionOnlySpec(
                     is ModelPropertyType.ValueObject -> ParameterSpec.builder(it.name, it.type.toTypeName())
                         .build()
 
-                    is ModelPropertyType.ValueObjectOption -> optionParameter(it.name, it.type.toTypeName())
+                    is ModelPropertyType.ValueObjectOption,
+                    is ModelPropertyType.ModelTemplateOption -> optionParameter(it.name, it.type.toTypeName())
 
                     is ModelPropertyType.Standard -> when (it.type.type) {
                         ClassNames.option -> optionParameter(it.name, it.type.toTypeName())
@@ -58,6 +60,7 @@ private fun ModelPropertyType.toTypeName(): TypeName {
         is ModelPropertyType.ModelTemplate,
         is ModelPropertyType.ValueObject -> type
 
-        is ModelPropertyType.ValueObjectOption -> optionOf(valueObjectType)
+        is ModelPropertyType.ValueObjectOption -> optionOf(valueObjectType).withNullability(type.isNullable)
+        is ModelPropertyType.ModelTemplateOption -> optionOf(modelType).withNullability(type.isNullable)
     }
 }

@@ -180,101 +180,8 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
         val typeDeclaration = type.declaration
         val modelTemplate = typeDeclaration.annotations.firstOrNull(::annotationShortNameEqualsValidatable)
 
-        if (modelTemplate == null) {
-            if (typeDeclaration is KSClassDeclaration) {
-                if (typeDeclaration.toClassName().canonicalName == QualifiedNames.ARROW_OPTION) {
-                    val valueObjectReferencePair = typeArguments.firstNotNullOfOrNull { arg ->
-                        val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
-                        val argType = resolveTypeReference(argTypeRef)
-                        val argTypeDec = argType.declaration
-                        if (argTypeDec !is KSClassDeclaration) return@firstNotNullOfOrNull null
-
-                        argTypeDec.superTypes.firstOrNull {
-                            resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
-                        }?.let {
-                            argType to it
-                        }
-                    }
-                    if (valueObjectReferencePair != null) {
-                        val typeArgument = valueObjectReferencePair.second.element?.typeArguments?.firstOrNull()!!
-                        val valueObjectValueType = resolveTypeReference(typeArgument.type!!)
-                        val valueFailureType = resolveValueValidatorFailureType(
-                            valueObjectReferencePair.first.declaration as KSClassDeclaration
-                        )
-
-                        return ModelPropertyType.ValueObjectOption(
-                            type = ClassNames.option,
-                            valueObjectType = valueObjectReferencePair.first.toClassNameWithNullability(),
-                            valueObjectValueType = valueObjectValueType.toClassName().withNullability(
-                                valueObjectReferencePair.first.nullability
-                            ),
-                            valueFailureType = valueFailureType,
-                            fieldFailureClassName = fieldFailureClassName.nestedClass(
-                                propertyName.replaceFirstChar { it.uppercaseChar() }
-                            )
-                        )
-                    }
-                }
-
-                val valueObjectReference = typeDeclaration.superTypes.firstOrNull {
-                    resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
-                }
-
-                if (valueObjectReference == null) {
-                    return ModelPropertyType.Standard(
-                        type = type.toClassName().withNullability(type.nullability),
-                        typeArguments = typeArguments.map {
-                            when (it.variance) {
-                                Variance.STAR -> ModelPropertyTypeArgument.Star
-                                Variance.INVARIANT,
-                                Variance.COVARIANT,
-                                Variance.CONTRAVARIANT -> ModelPropertyTypeArgument.Type(
-                                    resolveModelPropertyType(
-                                        propertyName,
-                                        it.type!!,
-                                        fieldFailureClassName
-                                    )
-                                )
-                            }
-                        }
-                    )
-                } else {
-                    val typeArgument = valueObjectReference.element?.typeArguments?.firstOrNull()!!
-                    val valueObjectValueType = resolveTypeReference(typeArgument.type!!)
-                    val valueFailureType = resolveValueValidatorFailureType(typeDeclaration)
-
-                    return ModelPropertyType.ValueObject(
-                        type = type.toClassNameWithNullability(),
-                        valueObjectValueType = valueObjectValueType.toClassName().withNullability(type.nullability),
-                        valueFailureType = valueFailureType,
-                        fieldFailureClassName = fieldFailureClassName.nestedClass(
-                            propertyName.replaceFirstChar { it.uppercaseChar() }
-                        )
-                    )
-                }
-            } else if (typeDeclaration is KSTypeAlias) {
-                // NOTE: This should keep the alias's name.
-                return resolveModelPropertyType(propertyName, typeDeclaration.type, fieldFailureClassName)
-            } else {
-                return ModelPropertyType.Standard(
-                    type = type.toClassName().withNullability(type.nullability),
-                    typeArguments = typeArguments.map {
-                        when (it.variance) {
-                            Variance.STAR -> ModelPropertyTypeArgument.Star
-                            Variance.INVARIANT,
-                            Variance.COVARIANT,
-                            Variance.CONTRAVARIANT -> ModelPropertyTypeArgument.Type(
-                                resolveModelPropertyType(
-                                    propertyName,
-                                    it.type!!,
-                                    fieldFailureClassName
-                                )
-                            )
-                        }
-                    }
-                )
-            }
-        } else {
+        // Finding model template option.
+        if (modelTemplate != null) {
             val modelTypeName = type.toClassName()
             val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
             return ModelPropertyType.ModelTemplate(
@@ -286,6 +193,140 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
                 fieldFailureClassName = fieldFailureClassName.nestedClass(upperPropertyName)
             )
         }
+
+        return when (typeDeclaration) {
+            is KSClassDeclaration -> resolveModelPropertyTypeClassDeclaration(
+                propertyName = propertyName,
+                type = type,
+                typeArguments = typeArguments,
+                typeDeclaration = typeDeclaration,
+                fieldFailureClassName = fieldFailureClassName
+            )
+
+            is KSTypeAlias -> resolveModelPropertyType(
+                propertyName = propertyName,
+                typeReference = typeDeclaration.type,
+                fieldFailureClassName = fieldFailureClassName
+            )
+
+            else -> ModelPropertyType.Standard(
+                type = type.toClassName().withNullability(type.nullability),
+                typeArguments = typeArguments.map {
+                    when (it.variance) {
+                        Variance.STAR -> ModelPropertyTypeArgument.Star
+                        Variance.INVARIANT,
+                        Variance.COVARIANT,
+                        Variance.CONTRAVARIANT -> ModelPropertyTypeArgument.Type(
+                            resolveModelPropertyType(
+                                propertyName = propertyName,
+                                typeReference = it.type!!,
+                                fieldFailureClassName = fieldFailureClassName
+                            )
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    private fun resolveModelPropertyTypeClassDeclaration(
+        propertyName: String,
+        type: KSType,
+        typeArguments: List<KSTypeArgument>,
+        typeDeclaration: KSClassDeclaration,
+        fieldFailureClassName: ClassName
+    ): ModelPropertyType {
+        if (typeDeclaration.toClassName().canonicalName == QualifiedNames.ARROW_OPTION) {
+            // Finding model template option.
+            val validatableTypeArgument = typeArguments.firstNotNullOfOrNull { arg ->
+                val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
+                resolveTypeReference(argTypeRef).takeIf {
+                    it.declaration.annotations.any(::annotationShortNameEqualsValidatable)
+                }
+            }
+            if (validatableTypeArgument != null) {
+                val modelTypeName = validatableTypeArgument.toClassNameWithNullability()
+                val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
+                return ModelPropertyType.ModelTemplateOption(
+                    type = ClassNames.option.withNullability(type.nullability),
+                    modelType = modelTypeName,
+                    fieldFailureType = ClassName(
+                        modelTypeName.packageName,
+                        modelTypeName.simpleName.appendFieldFailure()
+                    ),
+                    fieldFailureClassName = fieldFailureClassName.nestedClass(upperPropertyName)
+                )
+            }
+
+            // Finding value object option.
+            val valueObjectReferencePair = typeArguments.firstNotNullOfOrNull { arg ->
+                val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
+                val argType = resolveTypeReference(argTypeRef)
+                val argTypeDec = argType.declaration
+                if (argTypeDec !is KSClassDeclaration) return@firstNotNullOfOrNull null
+
+                argTypeDec.superTypes.firstOrNull {
+                    resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
+                }?.let {
+                    argType to it
+                }
+            }
+            if (valueObjectReferencePair != null) {
+                val typeArgument = valueObjectReferencePair.second.element?.typeArguments?.firstOrNull()!!
+                val valueObjectValueType = resolveTypeReference(typeArgument.type!!)
+                val valueFailureType = resolveValueValidatorFailureType(
+                    valueObjectReferencePair.first.declaration as KSClassDeclaration
+                )
+
+                return ModelPropertyType.ValueObjectOption(
+                    type = ClassNames.option.withNullability(type.nullability),
+                    valueObjectType = valueObjectReferencePair.first.toClassNameWithNullability(),
+                    valueObjectValueType = valueObjectValueType.toClassName().withNullability(
+                        valueObjectReferencePair.first.nullability
+                    ),
+                    valueFailureType = valueFailureType,
+                    fieldFailureClassName = fieldFailureClassName.nestedClass(
+                        propertyName.replaceFirstChar { it.uppercaseChar() }
+                    )
+                )
+            }
+        }
+
+        val valueObjectReference = typeDeclaration.superTypes.firstOrNull {
+            resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
+        }
+        if (valueObjectReference != null) {
+            val typeArgument = valueObjectReference.element?.typeArguments?.firstOrNull()!!
+            val valueObjectValueType = resolveTypeReference(typeArgument.type!!)
+            val valueFailureType = resolveValueValidatorFailureType(typeDeclaration)
+
+            return ModelPropertyType.ValueObject(
+                type = type.toClassNameWithNullability(),
+                valueObjectValueType = valueObjectValueType.toClassName().withNullability(type.nullability),
+                valueFailureType = valueFailureType,
+                fieldFailureClassName = fieldFailureClassName.nestedClass(
+                    propertyName.replaceFirstChar { it.uppercaseChar() }
+                )
+            )
+        }
+
+        return ModelPropertyType.Standard(
+            type = type.toClassName().withNullability(type.nullability),
+            typeArguments = typeArguments.map {
+                when (it.variance) {
+                    Variance.STAR -> ModelPropertyTypeArgument.Star
+                    Variance.INVARIANT,
+                    Variance.COVARIANT,
+                    Variance.CONTRAVARIANT -> ModelPropertyTypeArgument.Type(
+                        resolveModelPropertyType(
+                            propertyName = propertyName,
+                            typeReference = it.type!!,
+                            fieldFailureClassName = fieldFailureClassName
+                        )
+                    )
+                }
+            }
+        )
     }
 
     private fun resolveValueValidatorFailureType(valueObjectDeclaration: KSClassDeclaration): TypeName {

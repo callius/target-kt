@@ -30,15 +30,13 @@ inline fun CodeBlock.Builder.map(
     endControlFlow()
 }
 
-inline fun CodeBlock.Builder.validateModel(
+fun CodeBlock.Builder.validateModel(
     properties: List<ModelProperty>,
     model: ClassName,
-    getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
 ): CodeBlock.Builder = apply {
     val typedProperties = properties.mapToTyped { if (type.type.isNullable) vName else name }
-    validateValueObjects(typedProperties)
-    validateModelTemplates(typedProperties)
-    returnValidatedModel(model, typedProperties, getModelPropertyFailure)
+    validateProperties(typedProperties)
+    returnValidatedModel(model, typedProperties)
 }
 
 inline fun List<ModelProperty>.mapToTyped(validatedName: ModelProperty.() -> String) = map {
@@ -53,13 +51,32 @@ inline fun List<ModelProperty>.mapToTyped(validatedName: ModelProperty.() -> Str
         )
         is ModelPropertyType.ValueObject -> TypedModelProperty.ValueObject(it, it.type, it.vName)
         is ModelPropertyType.ModelTemplate -> TypedModelProperty.ModelTemplate(it, it.type, it.validatedName())
+        is ModelPropertyType.ModelTemplateOption -> TypedModelProperty.ModelTemplateOption(
+            property = it,
+            type = it.type,
+            validatedName = it.vName
+        )
     }
 }
 
-fun CodeBlock.Builder.validateValueObjects(properties: List<TypedModelProperty>) = properties.forEach {
+fun CodeBlock.Builder.validateProperties(properties: List<TypedModelProperty>) = properties.forEach {
     when (it) {
-        is TypedModelProperty.ModelTemplate,
-        is TypedModelProperty.Standard -> {
+        is TypedModelProperty.Standard -> {}
+
+        is TypedModelProperty.ModelTemplate -> if (it.type.type.isNullable) {
+            addStatement("val ${it.property.vName} = ${it.property.name} ?: %T(null)", ClassNames.right)
+        }
+
+        is TypedModelProperty.ModelTemplateOption -> if (it.type.modelType.isNullable) {
+            addStatement(
+                "val ${it.property.vName} = ${it.property.name}.fold({ %T(%T) }) { it?.map(::%T) ?: %T(%T(null)) }",
+                ClassNames.right, ClassNames.none, ClassNames.some, ClassNames.right, ClassNames.some
+            )
+        } else {
+            addStatement(
+                "val ${it.property.vName} = ${it.property.name}.fold({ %T(%T) }) { it.map(::%T) }",
+                ClassNames.right, ClassNames.none, ClassNames.some
+            )
         }
 
         is TypedModelProperty.ValueObject -> addValidationStatement(it.property, it.type.type)
@@ -76,31 +93,9 @@ fun CodeBlock.Builder.addValidationStatement(property: ModelProperty, valueObjec
     }
 }
 
-fun CodeBlock.Builder.validateModelTemplates(properties: List<TypedModelProperty>) = properties.forEach {
-    if (it is TypedModelProperty.ModelTemplate) {
-        if (it.type.type.isNullable) {
-            addStatement("val ${it.property.vName} = ${it.property.name} ?: %T(null)", ClassNames.right)
-        }
-    }
-}
-
-fun CodeBlock.Builder.validateModelTemplatesOption(properties: List<TypedModelProperty>) = properties.forEach {
-    if (it is TypedModelProperty.ModelTemplate) {
-        // TODO: Traverse is deprecated. Replace with:
-        //  .fold({ Either.Right(None) }, { it.map(::Some) }) and
-        //  .fold({ Either.Right(None) }, { it?.map(::Some) ?: Either.Right(Some(null)) })
-        if (it.type.type.isNullable) {
-            addStatement("val ${it.property.vName} = ${it.property.name}.traverse { it ?: %T(null) }", ClassNames.right)
-        } else {
-            addStatement("val ${it.property.vName} = ${it.property.name}.traverse(::%M)", MemberNames.identity)
-        }
-    }
-}
-
-inline fun CodeBlock.Builder.returnValidatedModel(
+fun CodeBlock.Builder.returnValidatedModel(
     model: ClassName,
-    typedProperties: List<TypedModelProperty>,
-    getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
+    typedProperties: List<TypedModelProperty>
 ) {
     if (typedProperties.all { it.validatedName == null }) {
         addStatement(
@@ -114,7 +109,8 @@ inline fun CodeBlock.Builder.returnValidatedModel(
                 is TypedModelProperty.Standard -> null
                 is TypedModelProperty.ValueObject -> it.validatedName to it.type.fieldFailureClassName
                 is TypedModelProperty.ValueObjectOption -> it.validatedName to it.fieldFailureClassName
-                is TypedModelProperty.ModelTemplate -> it.validatedName to getModelPropertyFailure(it.type)
+                is TypedModelProperty.ModelTemplate -> it.validatedName to it.type.fieldFailureClassName
+                is TypedModelProperty.ModelTemplateOption -> it.validatedName to it.type.fieldFailureClassName
             }
         }
         beginControlFlow(

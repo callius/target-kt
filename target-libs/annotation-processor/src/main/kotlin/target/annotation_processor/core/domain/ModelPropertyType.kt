@@ -81,4 +81,24 @@ sealed interface ModelPropertyType {
          */
         val fieldFailureClassName: ClassName
     ) : ModelPropertyType
+
+    data class ModelTemplateOption(
+
+        override val type: ClassName,
+
+        /**
+         * The type of the model class.
+         */
+        val modelType: ClassName,
+
+        /**
+         * The name of the field failure class.
+         */
+        val fieldFailureType: ClassName,
+
+        /**
+         * The name of the field failure class.
+         */
+        val fieldFailureClassName: ClassName
+    ) : ModelPropertyType
 }

@@ -23,8 +23,7 @@ fun generateCompanionOfSpec(
         .addCode(
             CodeBlock.builder().validateModel(
                 properties = properties,
-                model = modelClassName,
-                getModelPropertyFailure = { fieldFailureClassName }
+                model = modelClassName
             ).build()
         )
         .build()
@@ -36,6 +35,13 @@ private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
             nelOf(fieldFailureType),
             type.withNullability(false)
         ).withNullability(type.isNullable)
+
+        is ModelPropertyType.ModelTemplateOption -> optionOf(
+            eitherOf(
+                nelOf(fieldFailureType),
+                modelType.withNullability(false)
+            ).withNullability(modelType.isNullable)
+        )
 
         is ModelPropertyType.Standard -> type.withTypeArguments(
             typeArguments.map {
