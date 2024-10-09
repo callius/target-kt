@@ -1,22 +1,6 @@
 package target.annotation_processor.core.extension
 
 import com.google.devtools.ksp.symbol.KSAnnotation
-import com.google.devtools.ksp.symbol.KSType
-
-/**
- * Gets the 'name' argument from an annotation.
- */
-fun KSAnnotation.nameArgument(): String = arguments.first { it.name!!.asString() == "name" }.value as String
-
-/**
- * Gets the 'type' argument from an annotation.
- */
-fun KSAnnotation.typeArgument(): KSType = arguments.first { it.name?.asString() == "type" }.value as KSType
-
-/**
- * Gets the 'ignore' argument from an annotation.
- */
-fun KSAnnotation.ignoreArgument(): Boolean = arguments.first { it.name?.asString() == "ignore" }.value as Boolean
 
 /**
  * Converts this to a list, then finds all 'AddField' annotations in it, recursively checking each annotation's annotations.

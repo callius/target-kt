@@ -9,7 +9,7 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.validate
 import target.annotation_processor.core.domain.QualifiedNames
 
-class ModelTemplateProcessor(
+class ValidatableProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
     private val options: Map<String, String>
@@ -17,16 +17,14 @@ class ModelTemplateProcessor(
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver
-            .getSymbolsWithAnnotation(QualifiedNames.modelTemplate)
+            .getSymbolsWithAnnotation(QualifiedNames.VALIDATABLE)
             .filterIsInstance<KSClassDeclaration>()
 
         return if (!symbols.iterator().hasNext()) {
             emptyList()
         } else {
-            symbols.forEach { it.accept(modelTemplateVisitorPoet(), Unit) }
+            symbols.forEach { it.accept(ValidatableVisitorPoet(codeGenerator, logger), Unit) }
             symbols.filterNot { it.validate() }.toList()
         }
     }
-
-    private fun modelTemplateVisitorPoet() = ModelTemplateVisitorPoet(codeGenerator, logger)
 }

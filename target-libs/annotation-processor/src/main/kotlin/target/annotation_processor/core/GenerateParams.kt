@@ -1,10 +1,9 @@
 package target.annotation_processor.core
 
-import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.STAR
-import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.TypeSpec
-import target.annotation_processor.core.domain.*
+import com.squareup.kotlinpoet.*
+import target.annotation_processor.core.domain.ModelProperty
+import target.annotation_processor.core.domain.ModelPropertyType
+import target.annotation_processor.core.domain.ModelPropertyTypeArgument
 import target.annotation_processor.core.extension.appendParams
 import target.annotation_processor.core.extension.withNullability
 import target.annotation_processor.core.extension.withTypeArguments
@@ -13,18 +12,24 @@ import target.annotation_processor.core.extension.withTypeArguments
  * Generates a params data class with the given [properties].
  */
 fun generateParamsSpec(
-    failureClassName: ClassName,
     modelClassName: ClassName,
     properties: List<ModelProperty>
 ): TypeSpec {
-    return generateModelSpecBase(
-        failureClassName = failureClassName,
-        modelClassName = modelClassName,
-        properties = properties,
-        toTypeName = ModelPropertyType::toTypeName,
-        toValueObjectTypeName = ModelPropertyType::toValueObjectTypeName,
-        getModelPropertyFailure = { requiredFieldFailureClassName }
-    )
+    return TypeSpec.classBuilder(modelClassName)
+        .addModifiers(KModifier.DATA)
+        .primaryConstructor(
+            FunSpec.constructorBuilder().addParameters(
+                properties.map {
+                    ParameterSpec.builder(it.name, it.type.toTypeName()).build()
+                }
+            ).build()
+        )
+        .addProperties(
+            properties.map {
+                PropertySpec.builder(it.name, it.type.toTypeName()).initializer(it.name).build()
+            }
+        )
+        .build()
 }
 
 private fun ModelPropertyType.toTypeName(): TypeName {
@@ -44,25 +49,5 @@ private fun ModelPropertyType.toTypeName(): TypeName {
         )
 
         is ModelPropertyType.ValueObject -> type
-    }
-}
-
-private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
-    return when (this) {
-        is ModelPropertyType.ModelTemplate -> eitherOf(
-            nelOf(requiredFieldFailureType),
-            ClassName(type.packageName, type.simpleName.appendParams())
-        ).withNullability(type.isNullable)
-
-        is ModelPropertyType.Standard -> type.withTypeArguments(
-            typeArguments.map {
-                when (it) {
-                    ModelPropertyTypeArgument.Star -> STAR
-                    is ModelPropertyTypeArgument.Type -> it.parent.toValueObjectTypeName()
-                }
-            }
-        )
-
-        is ModelPropertyType.ValueObject -> valueObjectType
     }
 }

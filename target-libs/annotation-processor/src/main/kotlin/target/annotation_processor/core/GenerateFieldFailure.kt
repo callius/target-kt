@@ -7,7 +7,6 @@ import target.annotation_processor.core.domain.nelOf
 
 fun generateFieldFailureSpec(
     fieldFailureClassName: ClassName,
-    requiredFieldFailureClassName: ClassName,
     properties: List<ModelProperty>
 ): TypeSpec {
     return TypeSpec.interfaceBuilder(fieldFailureClassName)
@@ -30,7 +29,6 @@ fun generateFieldFailureSpec(
                                         .build()
                                 )
                                 .addSuperinterface(fieldFailureClassName)
-                                .run { if (it.isExternal) this else addSuperinterface(requiredFieldFailureClassName) }
                                 .build()
                         )
 
@@ -40,13 +38,6 @@ fun generateFieldFailureSpec(
                                     name = it.type.fieldFailureClassName.simpleName,
                                     nelFieldFailureType = nelOf(it.type.fieldFailureType),
                                     superInterface = fieldFailureClassName
-                                )
-                            )
-                            add(
-                                modelTemplateFieldFailure(
-                                    name = it.type.requiredFieldFailureClassName.simpleName,
-                                    nelFieldFailureType = nelOf(it.type.requiredFieldFailureType),
-                                    superInterface = requiredFieldFailureClassName
                                 )
                             )
                         }

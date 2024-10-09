@@ -10,6 +10,7 @@ sealed interface TypedModelProperty {
         override val property: ModelProperty,
         override val validatedName: String? = null
     ) : TypedModelProperty {
+
         constructor(property: ModelProperty) : this(
             property = property,
             validatedName = null,

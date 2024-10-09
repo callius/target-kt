@@ -1,10 +1,8 @@
 package target.annotation_processor.core
 
-import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.STAR
-import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.*
 import target.annotation_processor.core.domain.*
+import target.annotation_processor.core.extension.validateModel
 import target.annotation_processor.core.extension.withNullability
 import target.annotation_processor.core.extension.withTypeArguments
 
@@ -16,14 +14,40 @@ fun generateModelSpec(
     modelClassName: ClassName,
     properties: List<ModelProperty>
 ): TypeSpec {
-    return generateModelSpecBase(
-        failureClassName = failureClassName,
-        modelClassName = modelClassName,
-        properties = properties,
-        toTypeName = ModelPropertyType::toTypeName,
-        toValueObjectTypeName = ModelPropertyType::toValueObjectTypeName,
-        getModelPropertyFailure = { fieldFailureClassName }
-    )
+    return TypeSpec.classBuilder(modelClassName)
+        .addModifiers(KModifier.DATA)
+        .primaryConstructor(
+            FunSpec.constructorBuilder().addParameters(
+                properties.map {
+                    ParameterSpec.builder(it.name, it.type.toTypeName()).build()
+                }
+            ).build()
+        )
+        .addProperties(
+            properties.map {
+                PropertySpec.builder(it.name, it.type.toTypeName()).initializer(it.name).build()
+            }
+        )
+        .addType(
+            TypeSpec.companionObjectBuilder().addFunction(
+                FunSpec.builder(FunctionNames.OF)
+                    .addParameters(
+                        properties.map {
+                            ParameterSpec.builder(it.name, it.type.toValueObjectTypeName()).build()
+                        }
+                    )
+                    .returns(eitherOf(nelOf(failureClassName), modelClassName))
+                    .addCode(
+                        CodeBlock.builder().validateModel(
+                            properties = properties,
+                            model = modelClassName,
+                            getModelPropertyFailure = { fieldFailureClassName }
+                        ).build()
+                    )
+                    .build()
+            ).build()
+        )
+        .build()
 }
 
 private fun ModelPropertyType.toTypeName(): TypeName {

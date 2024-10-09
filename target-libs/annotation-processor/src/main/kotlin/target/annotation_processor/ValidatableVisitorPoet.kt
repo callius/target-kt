@@ -9,36 +9,47 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.writeTo
-import target.annotation_processor.core.*
 import target.annotation_processor.core.domain.*
-import target.annotation_processor.core.extension.*
+import target.annotation_processor.core.extension.addGeneratedComment
+import target.annotation_processor.core.extension.appendFieldFailure
+import target.annotation_processor.core.extension.withNullability
+import target.annotation_processor.core.generateCompanionOfSpec
+import target.annotation_processor.core.generateCompanionOnlySpec
+import target.annotation_processor.core.generateFieldFailureSpec
 import target.annotation_processor.core.visitor.CachedTypeReferenceResolverVisitorVoid
 
-class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private val logger: KSPLogger) :
+class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private val logger: KSPLogger) :
     CachedTypeReferenceResolverVisitorVoid() {
 
     companion object {
 
-        private const val MODEL_TEMPLATE_SIMPLE_NAME = "ModelTemplate"
+        private const val VALIDATABLE_SIMPLE_NAME = "ModelTemplate"
 
         private const val VALUE_VALIDATOR_FAILURE_TYPE_PARAMETER_INDEX = 1
 
-        private fun annotationShortNameEqualsModelTemplate(annotation: KSAnnotation) =
-            annotation.shortName.asString() == MODEL_TEMPLATE_SIMPLE_NAME
+        private fun annotationShortNameEqualsValidatable(annotation: KSAnnotation) =
+            annotation.shortName.asString() == VALIDATABLE_SIMPLE_NAME
     }
 
     override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Unit) {
-        if (classDeclaration.classKind != ClassKind.INTERFACE) {
-            logger.error("Only interfaces can be annotated with @$MODEL_TEMPLATE_SIMPLE_NAME", classDeclaration)
+        if (!classDeclaration.modifiers.contains(Modifier.DATA)) {
+            logger.error("Only data classes can be annotated with @$VALIDATABLE_SIMPLE_NAME", classDeclaration)
             return
         }
 
         val properties = classDeclaration.getAllProperties().filter { it.validate() }.toList()
         if (properties.isEmpty()) {
-            logger.error("Interface annotated with @$MODEL_TEMPLATE_SIMPLE_NAME must declare at least one property.")
+            logger.error("Data class annotated with @$VALIDATABLE_SIMPLE_NAME must declare at least one property.")
+            return
+        }
+
+        val companionObjectDeclaration = classDeclaration.declarations.firstOrNull {
+            it is KSClassDeclaration && it.isCompanionObject
+        }
+        if (companionObjectDeclaration == null) {
+            logger.error("Data class annotated with @$VALIDATABLE_SIMPLE_NAME must declare a companion object.")
             return
         }
 
@@ -46,66 +57,65 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
         val packageName = classDeclaration.packageName.asString()
 
         // Parsing model template annotation.
-        val modelTemplate = classDeclaration.annotations.first(::annotationShortNameEqualsModelTemplate)
-        val className = modelTemplate.nameArgument()
+        val modelName = classDeclaration.simpleName.asString()
+        val modelClassName = ClassName(packageName, modelName)
 
-        // Creating class names.
-        val fieldFailureName = className.appendFieldFailure()
+        // Creating companion object class name.
+        val companionObjectClassName =
+            ClassName(packageName, modelName, companionObjectDeclaration.simpleName.asString())
+
+        // Creating failure class names.
+        val fieldFailureName = modelName.appendFieldFailure()
         val fieldFailureClassName = ClassName(packageName, fieldFailureName)
-        val requiredFieldFailureName = className.appendRequiredFieldFailure()
-        val requiredFieldFailureClassName = ClassName(packageName, requiredFieldFailureName)
-        val paramsName = className.appendParams()
-        val builderName = className.appendBuilder()
-        val paramsClassName = ClassName(packageName, paramsName)
 
         // Generating model properties.
         val modelProperties = generateModelProperties(
             properties = properties,
-            addFieldAnnotations = classDeclaration.annotations.findAddFields(),
-            fieldFailureClassName
+            fieldFailureClassName = fieldFailureClassName
         )
 
-        // Creating params and builder properties.
-        val paramsProperties = modelProperties.filter { it.isNotExternal }
+        val shouldGenerateOnly = modelProperties.any { it.type.type == ClassNames.option }
 
         // Generating files.
         writeFileSpecList(
             Dependencies(false, classDeclaration.containingFile!!),
-            generateFileSpec(
-                packageName = packageName,
-                fileName = fieldFailureName,
-                generateRequiredFieldFailureSpec(requiredFieldFailureName),
-                generateFieldFailureSpec(
-                    fieldFailureClassName = fieldFailureClassName,
-                    requiredFieldFailureClassName = requiredFieldFailureClassName,
-                    properties = modelProperties
+            buildList {
+                add(
+                    generateFileSpec(
+                        packageName = packageName,
+                        fileName = fieldFailureName,
+                        generateFieldFailureSpec(
+                            fieldFailureClassName = fieldFailureClassName,
+                            properties = modelProperties
+                        )
+                    )
                 )
-            ),
-            generateFileSpec(
-                packageName = packageName,
-                fileName = className,
-                generateModelSpec(
-                    failureClassName = fieldFailureClassName,
-                    modelClassName = ClassName(packageName, className),
-                    properties = modelProperties
+                add(
+                    generateFileSpec(
+                        packageName = packageName,
+                        fileName = "${modelName}CompanionOf",
+                        generateCompanionOfSpec(
+                            failureClassName = fieldFailureClassName,
+                            modelClassName = modelClassName,
+                            companionObjectClassName = companionObjectClassName,
+                            properties = modelProperties
+                        )
+                    )
                 )
-            ),
-            generateFileSpec(
-                packageName = packageName,
-                fileName = paramsName,
-                generateParamsSpec(
-                    modelClassName = paramsClassName,
-                    properties = paramsProperties
-                )
-            ),
-            generateFileSpec(
-                packageName = packageName,
-                fileName = builderName,
-                generateBuilderSpec(
-                    builderClassName = ClassName(packageName, builderName),
-                    paramsProperties = paramsProperties,
-                )
-            )
+                if (shouldGenerateOnly) {
+                    add(
+                        generateFileSpec(
+                            packageName = packageName,
+                            fileName = "${modelName}CompanionOnly",
+                            generateCompanionOnlySpec(
+                                modelClassName = modelClassName,
+                                companionObjectClassName = companionObjectClassName,
+                                properties = modelProperties
+                            )
+                        )
+                    )
+                }
+            }
         )
     }
 
@@ -114,47 +124,29 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
      */
     private fun generateModelProperties(
         properties: List<KSPropertyDeclaration>,
-        addFieldAnnotations: List<KSAnnotation>,
         fieldFailureClassName: ClassName
     ): List<ModelProperty> {
-        return buildList {
-            // Adding defined properties.
-            properties.forEach { add(it.toModelProperty(fieldFailureClassName)) }
-
-            // Adding properties defined by AddField annotations.
-            addFieldAnnotations.forEach { add(it.toModelProperty(fieldFailureClassName)) }
-        }
+        return properties.map { it.toModelProperty(fieldFailureClassName) }
     }
 
     /**
-     * Generates a file with the given [typeSpec], adding a comment and proper indent.
+     * Generates a file with the given [specs], adding a comment and proper indent.
      */
-    private fun generateFileSpec(packageName: String, fileName: String, vararg typeSpec: TypeSpec): FileSpec {
+    private fun generateFileSpec(packageName: String, fileName: String, vararg specs: Any): FileSpec {
         return FileSpec.builder(packageName = packageName, fileName = fileName)
             .addGeneratedComment()
-            .apply { members.addAll(typeSpec) }
-            .indent(Indent.one)
+            .apply { members.addAll(specs) }
+            .indent(Indent.ONE)
             .build()
     }
 
     /**
      * Writes the given [fileSpecs] to the [codeGenerator] with the given [dependencies].
      */
-    private fun writeFileSpecList(dependencies: Dependencies, vararg fileSpecs: FileSpec) {
+    private fun writeFileSpecList(dependencies: Dependencies, fileSpecs: List<FileSpec>) {
         fileSpecs.forEach {
             it.writeTo(codeGenerator, dependencies)
         }
-    }
-
-    private fun KSAnnotation.toModelProperty(fieldFailureClassName: ClassName): ModelProperty {
-        val addFieldType = typeArgument()
-        val propertyName = nameArgument()
-        return ModelProperty(
-            name = propertyName,
-            // NOTE: Add field annotations are not able to capture type arguments.
-            type = resolveModelPropertyType(propertyName, addFieldType, emptyList(), fieldFailureClassName),
-            isExternal = ignoreArgument(),
-        )
     }
 
     private fun KSPropertyDeclaration.toModelProperty(fieldFailureClassName: ClassName): ModelProperty {
@@ -162,7 +154,6 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
         return ModelProperty(
             name = simpleNameAsString,
             type = resolveModelPropertyType(simpleNameAsString, type, fieldFailureClassName),
-            isExternal = isExternal(),
         )
     }
 
@@ -186,12 +177,12 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
         fieldFailureClassName: ClassName,
     ): ModelPropertyType {
         val typeDeclaration = type.declaration
-        val modelTemplate = typeDeclaration.annotations.firstOrNull(::annotationShortNameEqualsModelTemplate)
+        val modelTemplate = typeDeclaration.annotations.firstOrNull(::annotationShortNameEqualsValidatable)
 
         return if (modelTemplate == null) {
             if (typeDeclaration is KSClassDeclaration) {
                 val valueObjectReference = typeDeclaration.superTypes.firstOrNull {
-                    resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.valueObject
+                    resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
                 }
 
                 if (valueObjectReference == null) {
@@ -249,20 +240,15 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
                 )
             }
         } else {
-            val modelName = modelTemplate.nameArgument()
+            val modelTypeName = type.toClassName()
             val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
             ModelPropertyType.ModelTemplate(
-                type = ClassName(typeDeclaration.packageName.asString(), modelName).withNullability(type.nullability),
+                type = modelTypeName.withNullability(type.nullability),
                 fieldFailureType = ClassName(
-                    typeDeclaration.packageName.asString(),
-                    modelName.appendFieldFailure()
+                    modelTypeName.packageName,
+                    modelTypeName.simpleName.appendFieldFailure()
                 ),
-                requiredFieldFailureType = ClassName(
-                    typeDeclaration.packageName.asString(),
-                    modelName.appendRequiredFieldFailure()
-                ),
-                fieldFailureClassName = fieldFailureClassName.nestedClass(upperPropertyName),
-                requiredFieldFailureClassName = fieldFailureClassName.nestedClass("Required$upperPropertyName")
+                fieldFailureClassName = fieldFailureClassName.nestedClass(upperPropertyName)
             )
         }
     }
@@ -368,7 +354,7 @@ class ModelTemplateVisitorPoet(private val codeGenerator: CodeGenerator, private
     }
 
     private fun KSClassDeclaration.qualifiedNameEqualsValueValidator(): Boolean {
-        return qualifiedName?.asString() == QualifiedNames.valueValidator
+        return qualifiedName?.asString() == QualifiedNames.VALUE_VALIDATOR
     }
 
     private fun resolveTypeName(

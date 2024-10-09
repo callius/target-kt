@@ -158,13 +158,34 @@ inline fun List<ModelProperty>.mapToTyped(validatedName: ModelProperty.() -> Str
 }
 
 fun CodeBlock.Builder.validateValueObjects(properties: List<TypedModelProperty>) = properties.forEach {
-    if (it is TypedModelProperty.ValueObject) {
-        val nonNullableType = it.type.type.copy(nullable = false)
-        if (it.type.type.isNullable) {
-            addStatement("val ${it.property.vName} = %T.ofNullable(${it.property.name})", nonNullableType)
-        } else {
-            addStatement("val ${it.property.vName} = %T.of(${it.property.name})", nonNullableType)
+    when (it) {
+        is TypedModelProperty.ModelTemplate -> {}
+        is TypedModelProperty.Standard -> when (it.property.type.type) {
+            ClassNames.option -> when (val type =
+                (it.property.type as ModelPropertyType.Standard).typeArguments.first()) {
+                ModelPropertyTypeArgument.Star -> {}
+                is ModelPropertyTypeArgument.Type -> when (type.parent) {
+                    is ModelPropertyType.ModelTemplate,
+                    is ModelPropertyType.Standard -> {
+                    }
+
+                    is ModelPropertyType.ValueObject -> addValidationStatement(it.property, type.parent)
+                }
+            }
+
+            else -> {}
         }
+
+        is TypedModelProperty.ValueObject -> addValidationStatement(it.property, it.type)
+    }
+}
+
+fun CodeBlock.Builder.addValidationStatement(property: ModelProperty, valueObjectType: ModelPropertyType.ValueObject) {
+    val nonNullableType = valueObjectType.type.copy(nullable = false)
+    if (property.type.type.isNullable) {
+        addStatement("val ${property.vName} = %T.ofNullable(${property.name})", nonNullableType)
+    } else {
+        addStatement("val ${property.vName} = %T.of(${property.name})", nonNullableType)
     }
 }
 
@@ -194,6 +215,7 @@ inline fun CodeBlock.Builder.returnValidatedModel(
     typedProperties: List<TypedModelProperty>,
     getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
 ) {
+    // TODO: Fix.
     if (typedProperties.all { it.validatedName == null }) {
         addStatement(
             "return %T(%T(" + typedProperties.joinToString(", ") { it.property.name } + "))",

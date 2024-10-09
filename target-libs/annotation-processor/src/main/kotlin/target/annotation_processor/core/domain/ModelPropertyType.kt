@@ -53,16 +53,6 @@ sealed interface ModelPropertyType {
         /**
          * The name of the field failure class.
          */
-        val requiredFieldFailureType: ClassName,
-
-        /**
-         * The name of the field failure class.
-         */
-        val fieldFailureClassName: ClassName,
-
-        /**
-         * The name of the field failure class.
-         */
-        val requiredFieldFailureClassName: ClassName
+        val fieldFailureClassName: ClassName
     ) : ModelPropertyType
 }

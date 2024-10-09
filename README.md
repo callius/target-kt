@@ -376,5 +376,6 @@ See the [KSP docs](https://kotlinlang.org/docs/ksp-overview.html) for additional
 
 ## Roadmap
 
-1. Add generated `ModelRequiredField` enum and update `Buildable` interface signature. Add validation function to
-   ModelParams taking `Option` parameters for validation without an intermediate builder.
+1. Add `Parseable` annotation.
+   * Add `ValueObjectParser` interface.
+   * Generate `parse` function.

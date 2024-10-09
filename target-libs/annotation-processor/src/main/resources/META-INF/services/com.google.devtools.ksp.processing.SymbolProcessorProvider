@@ -1,1 +1,1 @@
-target.annotation_processor.ModelTemplateProcessorProvider
+target.annotation_processor.ValidatableProcessorProvider
