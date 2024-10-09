@@ -5,12 +5,12 @@ Feature:
 - Kotlin 2.0.20
 - KSP 2.0.20-1.0.25
 - Arrow 1.2.0
-- Kotlinx-Datetime 0.6.0
 - Dokka 1.9.20
 
 Breaking:
 
-- 
+- Removed Kotlinx-Datetime dependency.
+- New annotation paradigm centered around `Validatable`. See readme for more details.
 
 ## 0.4.0
 

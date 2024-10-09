@@ -100,41 +100,59 @@ suspend fun createUser(params: UserParamsDto) = either {
 ## Annotation Processor
 
 The Target annotation processor library makes it easy to create functionally validated models. It takes the properties
-of a model template interface and generates four main classes: failure, model, params, and builder.
+of a model data class and generates:
 
-#### Failure
+1. A sealed set of failure classes.
+2. A validation function `Companion.of()` using said failure classes.
+3. A syntactic sugar function `Companion.only()` when the model contains one or more fields with an `Option` type.
+
+### Failure
 
 The failure class is a sealed interface containing data classes for each value object property declared on the model
-template, containing a single value, `parent`, with a type of the value object validator's failure type. A required
-variant of the failure interface is also generated and is assigned to failures for properties not annotated
-with `@External`.
+template, containing a single value, `parent`, with a type of the value object validator's failure type.
 
 ```kotlin
-sealed interface ModelRequiredFieldFailure
-
 sealed interface ModelFieldFailure {
 
-    data class ExternalProperty(val parent: ExternalPropertyFailure) : ModelFieldFailure
+    data class Property1(val parent: Property1Failure) : ModelFieldFailure
 
-    data class Property(val parent: PropertyFailure) : ModelFieldFailure, ModelRequiredFieldFailure
+    data class Property2(val parent: Property2Failure) : ModelFieldFailure
+
+    /* ... */
 }
 ```
 
-#### Model
+### Validation Function
 
-The model class is the complete model and contains a validation function, `of`, similar to `ValueValidator`, which takes
-the raw value object property types and performs cumulative validation, calling each value object's validator and
-returning either a non-empty list of model field failures or a model instance.
+The validation function, named `of`, validates the model's fields similar to the behavior of the `ValueValidator` by
+taking the raw value object property types and performing cumulative validation, calling each value object's validator
+and returning either a non-empty list of model field failures or a model instance.
 
 ```kotlin
-data class Model(/* ... */) {
-    companion object {
-        fun of(/* ... */): Either<Nel<ModelFieldFailure>, Model>
-    }
+fun Model.Companion.of(/* ... */): Either<Nel<ModelFieldFailure>, Model>
+```
+
+#### Optional Properties
+
+It is also capable of validating optional value objects. This is useful when defining a model builder/update params class
+representing updated model fields.
+
+```kotlin
+@Validatable
+data class ModelBuilder(
+    val property1: Option<ModelProperty1>
+) {
+    companion object
+}
+
+fun ModelBuilder.Companion.of(
+    property1: Option<RawModelProperty1>
+): Either<Nel<ModelBuilderFieldFailure>, ModelBuilder> {
+    TODO("...generated validation logic...")
 }
 ```
 
-#### Params
+### Params
 
 The params class is the model class excluding the model template properties annotated with `@External`. It is intended
 to contain all the required/non-generated properties used to create a model.
@@ -145,81 +163,6 @@ data class ModelParams(/* ... */) {
         fun of(/* ... */): Either<Nel<ModelRequiredFieldFailure>, ModelParams>
     }
 }
-```
-
-#### Builder
-
-The builder class is the params class with each property wrapped in an `Option` and implements the `Buildable` interface
-by performing a zip operation on its properties. It is intended to be used to perform a partial update operation on a
-model. It also contains a convenience function, `only`, which delegates to the primary constructor with each parameter
-defaulting to `None`.
-
-```kotlin
-data class ModelBuilder(/* ... */) : Buildable<ModelParams> {
-    override fun build(): Option<ModelParams>
-
-    companion object {
-        fun of(/* ... */): Either<Nel<ModelRequiredFieldFailure>, ModelBuilder>
-
-        fun only(/* ... */): ModelBuilder
-    }
-}
-```
-
-### Adding Fields
-
-Fields can be added not only by declaring them on the model template interface, but also via the `AddField` annotation.
-Fields added with this annotation are external by default.
-
-```kotlin
-@AddField("id", PositiveInt::class)
-@ModelTemplate("Test")
-interface TestModel {
-    /** ... */
-}
-```
-
-Is equivalent to:
-
-```kotlin
-@ModelTemplate("Test")
-interface TestModel {
-
-    @External
-    val id: PositiveInt
-
-    /** ... */
-}
-```
-
-The `AddField` annotation is intended to only be used for composition and should not be added to the model template
-interface directly. This may be enforced in the future by changing its `@Target` to `AnnotationTarget.ANNOTATION_CLASS`.
-To use it properly, add it to a new annotation and use the newly-created annotation instead.
-
-```kotlin
-@AddField("id", PositiveInt::class)
-annotation class HasPositiveIntId
-
-// ...
-
-@HasPositiveIntId
-@ModelTemplate("Test")
-interface TestModel {
-    /** ... */
-}
-```
-
-This is also how the included `HasCreated` and `HasCreatedAndUpdated` annotations work internally.
-
-```kotlin
-@AddField(name = "created", type = Instant::class)
-annotation class HasCreated
-```
-
-```kotlin
-@HasUpdated
-@HasCreated
-annotation class HasCreatedAndUpdated
 ```
 
 ### Nested Models
@@ -377,5 +320,5 @@ See the [KSP docs](https://kotlinlang.org/docs/ksp-overview.html) for additional
 ## Roadmap
 
 1. Add `Parseable` annotation.
-   * Add `ValueObjectParser` interface.
-   * Generate `parse` function.
+    * Add `ValueObjectParser` interface.
+    * Generate `parse` function.
