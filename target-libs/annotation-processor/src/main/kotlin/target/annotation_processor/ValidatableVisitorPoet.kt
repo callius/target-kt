@@ -14,6 +14,7 @@ import com.squareup.kotlinpoet.ksp.writeTo
 import target.annotation_processor.core.domain.*
 import target.annotation_processor.core.extension.addGeneratedComment
 import target.annotation_processor.core.extension.appendFieldFailure
+import target.annotation_processor.core.extension.toClassNameWithNullability
 import target.annotation_processor.core.extension.withNullability
 import target.annotation_processor.core.generateCompanionOfSpec
 import target.annotation_processor.core.generateCompanionOnlySpec
@@ -25,7 +26,7 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
 
     companion object {
 
-        private const val VALIDATABLE_SIMPLE_NAME = "ModelTemplate"
+        private const val VALIDATABLE_SIMPLE_NAME = "Validatable"
 
         private const val VALUE_VALIDATOR_FAILURE_TYPE_PARAMETER_INDEX = 1
 
@@ -179,14 +180,48 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
         val typeDeclaration = type.declaration
         val modelTemplate = typeDeclaration.annotations.firstOrNull(::annotationShortNameEqualsValidatable)
 
-        return if (modelTemplate == null) {
+        if (modelTemplate == null) {
             if (typeDeclaration is KSClassDeclaration) {
+                if (typeDeclaration.toClassName().canonicalName == QualifiedNames.ARROW_OPTION) {
+                    val valueObjectReferencePair = typeArguments.firstNotNullOfOrNull { arg ->
+                        val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
+                        val argType = resolveTypeReference(argTypeRef)
+                        val argTypeDec = argType.declaration
+                        if (argTypeDec !is KSClassDeclaration) return@firstNotNullOfOrNull null
+
+                        argTypeDec.superTypes.firstOrNull {
+                            resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
+                        }?.let {
+                            argType to it
+                        }
+                    }
+                    if (valueObjectReferencePair != null) {
+                        val typeArgument = valueObjectReferencePair.second.element?.typeArguments?.firstOrNull()!!
+                        val valueObjectValueType = resolveTypeReference(typeArgument.type!!)
+                        val valueFailureType = resolveValueValidatorFailureType(
+                            valueObjectReferencePair.first.declaration as KSClassDeclaration
+                        )
+
+                        return ModelPropertyType.ValueObjectOption(
+                            type = ClassNames.option,
+                            valueObjectType = valueObjectReferencePair.first.toClassNameWithNullability(),
+                            valueObjectValueType = valueObjectValueType.toClassName().withNullability(
+                                valueObjectReferencePair.first.nullability
+                            ),
+                            valueFailureType = valueFailureType,
+                            fieldFailureClassName = fieldFailureClassName.nestedClass(
+                                propertyName.replaceFirstChar { it.uppercaseChar() }
+                            )
+                        )
+                    }
+                }
+
                 val valueObjectReference = typeDeclaration.superTypes.firstOrNull {
                     resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
                 }
 
                 if (valueObjectReference == null) {
-                    ModelPropertyType.Standard(
+                    return ModelPropertyType.Standard(
                         type = type.toClassName().withNullability(type.nullability),
                         typeArguments = typeArguments.map {
                             when (it.variance) {
@@ -205,12 +240,12 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
                     )
                 } else {
                     val typeArgument = valueObjectReference.element?.typeArguments?.firstOrNull()!!
-                    val valueObjectType = resolveTypeReference(typeArgument.type!!)
+                    val valueObjectValueType = resolveTypeReference(typeArgument.type!!)
                     val valueFailureType = resolveValueValidatorFailureType(typeDeclaration)
 
-                    ModelPropertyType.ValueObject(
-                        type = type.toClassName().withNullability(type.nullability),
-                        valueObjectType = valueObjectType.toClassName().withNullability(type.nullability),
+                    return ModelPropertyType.ValueObject(
+                        type = type.toClassNameWithNullability(),
+                        valueObjectValueType = valueObjectValueType.toClassName().withNullability(type.nullability),
                         valueFailureType = valueFailureType,
                         fieldFailureClassName = fieldFailureClassName.nestedClass(
                             propertyName.replaceFirstChar { it.uppercaseChar() }
@@ -219,9 +254,9 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
                 }
             } else if (typeDeclaration is KSTypeAlias) {
                 // NOTE: This should keep the alias's name.
-                resolveModelPropertyType(propertyName, typeDeclaration.type, fieldFailureClassName)
+                return resolveModelPropertyType(propertyName, typeDeclaration.type, fieldFailureClassName)
             } else {
-                ModelPropertyType.Standard(
+                return ModelPropertyType.Standard(
                     type = type.toClassName().withNullability(type.nullability),
                     typeArguments = typeArguments.map {
                         when (it.variance) {
@@ -242,7 +277,7 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
         } else {
             val modelTypeName = type.toClassName()
             val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
-            ModelPropertyType.ModelTemplate(
+            return ModelPropertyType.ModelTemplate(
                 type = modelTypeName.withNullability(type.nullability),
                 fieldFailureType = ClassName(
                     modelTypeName.packageName,

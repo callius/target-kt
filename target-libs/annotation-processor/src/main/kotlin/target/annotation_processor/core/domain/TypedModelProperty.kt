@@ -1,5 +1,7 @@
 package target.annotation_processor.core.domain
 
+import com.squareup.kotlinpoet.ClassName
+
 sealed interface TypedModelProperty {
 
     val property: ModelProperty
@@ -20,6 +22,14 @@ sealed interface TypedModelProperty {
     class ValueObject(
         override val property: ModelProperty,
         val type: ModelPropertyType.ValueObject,
+        override val validatedName: String
+    ) : TypedModelProperty
+
+    class ValueObjectOption(
+        override val property: ModelProperty,
+        val type: ModelPropertyType.ValueObjectOption,
+        val valueObjectType: ClassName,
+        val fieldFailureClassName: ClassName,
         override val validatedName: String
     ) : TypedModelProperty
 

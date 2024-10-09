@@ -17,7 +17,33 @@ sealed interface ModelPropertyType {
         /**
          * The type of the value contained in the value object.
          */
-        val valueObjectType: TypeName,
+        val valueObjectValueType: TypeName,
+
+        /**
+         * The type of the value failure returned by the value object's value validator.
+         */
+        val valueFailureType: TypeName,
+
+        /**
+         * The name of the field failure class.
+         */
+        val fieldFailureClassName: ClassName
+
+    ) : ModelPropertyType
+
+    data class ValueObjectOption(
+
+        override val type: ClassName,
+
+        /**
+         * The type of the value object.
+         */
+        val valueObjectType: ClassName,
+
+        /**
+         * The type of the value contained in the value object.
+         */
+        val valueObjectValueType: TypeName,
 
         /**
          * The type of the value failure returned by the value object's value validator.

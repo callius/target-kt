@@ -16,20 +16,19 @@ fun generateFieldFailureSpec(
                 properties.forEach {
                     when (it.type) {
                         is ModelPropertyType.ValueObject -> add(
-                            TypeSpec.classBuilder(it.type.fieldFailureClassName.simpleName)
-                                .addModifiers(KModifier.DATA)
-                                .primaryConstructor(
-                                    FunSpec.constructorBuilder()
-                                        .addParameter("parent", it.type.valueFailureType)
-                                        .build()
-                                )
-                                .addProperty(
-                                    PropertySpec.builder("parent", it.type.valueFailureType)
-                                        .initializer("parent")
-                                        .build()
-                                )
-                                .addSuperinterface(fieldFailureClassName)
-                                .build()
+                            valueObjectFieldFailure(
+                                className = it.type.fieldFailureClassName.simpleName,
+                                valueFailureTypeName = it.type.valueFailureType,
+                                fieldFailureClassName = fieldFailureClassName
+                            )
+                        )
+
+                        is ModelPropertyType.ValueObjectOption -> add(
+                            valueObjectFieldFailure(
+                                className = it.type.fieldFailureClassName.simpleName,
+                                valueFailureTypeName = it.type.valueFailureType,
+                                fieldFailureClassName = fieldFailureClassName
+                            )
                         )
 
                         is ModelPropertyType.ModelTemplate -> {
@@ -49,6 +48,25 @@ fun generateFieldFailureSpec(
         )
         .build()
 }
+
+private fun valueObjectFieldFailure(
+    className: String,
+    valueFailureTypeName: TypeName,
+    fieldFailureClassName: ClassName
+) = TypeSpec.classBuilder(className)
+    .addModifiers(KModifier.DATA)
+    .primaryConstructor(
+        FunSpec.constructorBuilder()
+            .addParameter("parent", valueFailureTypeName)
+            .build()
+    )
+    .addProperty(
+        PropertySpec.builder("parent", valueFailureTypeName)
+            .initializer("parent")
+            .build()
+    )
+    .addSuperinterface(fieldFailureClassName)
+    .build()
 
 private fun modelTemplateFieldFailure(
     name: String,

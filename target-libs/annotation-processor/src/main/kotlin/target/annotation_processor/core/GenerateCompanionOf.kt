@@ -46,6 +46,7 @@ private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
             }
         )
 
-        is ModelPropertyType.ValueObject -> valueObjectType
+        is ModelPropertyType.ValueObject -> valueObjectValueType
+        is ModelPropertyType.ValueObjectOption -> optionOf(valueObjectValueType)
     }
 }

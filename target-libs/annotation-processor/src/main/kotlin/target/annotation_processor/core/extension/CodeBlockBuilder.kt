@@ -5,103 +5,6 @@ import com.squareup.kotlinpoet.CodeBlock
 import target.annotation_processor.core.domain.*
 
 /**
- * Applies a zip function for the given Option [params] with the given [block] body.
- */
-fun CodeBlock.Builder.zipOptionParams(
-    params: List<ModelProperty>,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    if (params.isEmpty()) {
-        add("%T(", ClassNames.some)
-        block()
-        add(")")
-    } else {
-        val param = params.first()
-        addOptionPropertyReceiver(param) {
-            if (params.size == 1) {
-                map(param.vName, block)
-            } else {
-                flatMap(param.vName) {
-                    zipOptionParams(params.drop(1), block)
-                }
-            }
-        }
-    }
-}
-
-/**
- * Adds the receiver for the given Option [param]. If the [param] is a builder,
- * the receiver is the result of the flat-mapped built value.
- */
-inline fun CodeBlock.Builder.addOptionPropertyReceiver(
-    param: ModelProperty,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    when (val optionType =
-        ((param.type as ModelPropertyType.Standard).typeArguments.first() as ModelPropertyTypeArgument.Type).parent) {
-        is ModelPropertyType.ModelTemplate -> {
-            val vName1 = "${param.vName}1"
-            flatMap(param.name, vName1) {
-                if (optionType.type.isNullable) {
-                    add("($vName1?.build() ?: %T(null))", ClassNames.some)
-                } else {
-                    add("$vName1.build()")
-                }
-                block()
-            }
-        }
-
-        is ModelPropertyType.Standard,
-        is ModelPropertyType.ValueObject -> add(param.name).block()
-    }
-}
-
-/**
- * Ends the control flow with an optional new line.
- */
-fun CodeBlock.Builder.endFlowControl(endNewLine: Boolean): CodeBlock.Builder = apply {
-    if (endNewLine) {
-        endControlFlow()
-    } else {
-        unindent()
-        add("}")
-    }
-}
-
-/**
- * Calls 'flatMap' on the given [receiver] with the given [block] body containing the scoped [parameterName].
- */
-inline fun CodeBlock.Builder.flatMap(
-    receiver: String,
-    parameterName: String,
-    endNewLine: Boolean = true,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    beginControlFlow(
-        "$receiver.%M·{ $parameterName ->",
-        MemberNames.flatMap
-    )
-    block()
-    endFlowControl(endNewLine)
-}
-
-/**
- * Calls 'flatMap' with the given [block] body containing the scoped [parameterName].
- */
-inline fun CodeBlock.Builder.flatMap(
-    parameterName: String,
-    endNewLine: Boolean = true,
-    block: CodeBlock.Builder.() -> CodeBlock.Builder
-): CodeBlock.Builder = apply {
-    beginControlFlow(
-        ".%M·{ $parameterName ->",
-        MemberNames.flatMap
-    )
-    block()
-    endFlowControl(endNewLine)
-}
-
-/**
  * Calls 'map' for the given [property] with the given [block] body.
  */
 inline fun CodeBlock.Builder.map(
@@ -138,20 +41,16 @@ inline fun CodeBlock.Builder.validateModel(
     returnValidatedModel(model, typedProperties, getModelPropertyFailure)
 }
 
-inline fun CodeBlock.Builder.validateModelBuilder(
-    properties: List<ModelProperty>,
-    model: ClassName,
-    getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
-): CodeBlock.Builder = apply {
-    val typedProperties = properties.mapToTyped { vName }
-    validateValueObjects(typedProperties)
-    validateModelTemplatesOption(typedProperties)
-    returnValidatedModel(model, typedProperties, getModelPropertyFailure)
-}
-
 inline fun List<ModelProperty>.mapToTyped(validatedName: ModelProperty.() -> String) = map {
     when (it.type) {
         is ModelPropertyType.Standard -> TypedModelProperty.Standard(it)
+        is ModelPropertyType.ValueObjectOption -> TypedModelProperty.ValueObjectOption(
+            property = it,
+            type = it.type,
+            valueObjectType = it.type.valueObjectType,
+            fieldFailureClassName = it.type.fieldFailureClassName,
+            validatedName = it.vName
+        )
         is ModelPropertyType.ValueObject -> TypedModelProperty.ValueObject(it, it.type, it.vName)
         is ModelPropertyType.ModelTemplate -> TypedModelProperty.ModelTemplate(it, it.type, it.validatedName())
     }
@@ -159,30 +58,18 @@ inline fun List<ModelProperty>.mapToTyped(validatedName: ModelProperty.() -> Str
 
 fun CodeBlock.Builder.validateValueObjects(properties: List<TypedModelProperty>) = properties.forEach {
     when (it) {
-        is TypedModelProperty.ModelTemplate -> {}
-        is TypedModelProperty.Standard -> when (it.property.type.type) {
-            ClassNames.option -> when (val type =
-                (it.property.type as ModelPropertyType.Standard).typeArguments.first()) {
-                ModelPropertyTypeArgument.Star -> {}
-                is ModelPropertyTypeArgument.Type -> when (type.parent) {
-                    is ModelPropertyType.ModelTemplate,
-                    is ModelPropertyType.Standard -> {
-                    }
-
-                    is ModelPropertyType.ValueObject -> addValidationStatement(it.property, type.parent)
-                }
-            }
-
-            else -> {}
+        is TypedModelProperty.ModelTemplate,
+        is TypedModelProperty.Standard -> {
         }
 
-        is TypedModelProperty.ValueObject -> addValidationStatement(it.property, it.type)
+        is TypedModelProperty.ValueObject -> addValidationStatement(it.property, it.type.type)
+        is TypedModelProperty.ValueObjectOption -> addValidationStatement(it.property, it.valueObjectType)
     }
 }
 
-fun CodeBlock.Builder.addValidationStatement(property: ModelProperty, valueObjectType: ModelPropertyType.ValueObject) {
-    val nonNullableType = valueObjectType.type.copy(nullable = false)
-    if (property.type.type.isNullable) {
+fun CodeBlock.Builder.addValidationStatement(property: ModelProperty, valueObjectClassName: ClassName) {
+    val nonNullableType = valueObjectClassName.copy(nullable = false)
+    if (valueObjectClassName.isNullable) {
         addStatement("val ${property.vName} = %T.ofNullable(${property.name})", nonNullableType)
     } else {
         addStatement("val ${property.vName} = %T.of(${property.name})", nonNullableType)
@@ -215,7 +102,6 @@ inline fun CodeBlock.Builder.returnValidatedModel(
     typedProperties: List<TypedModelProperty>,
     getModelPropertyFailure: ModelPropertyType.ModelTemplate.() -> ClassName
 ) {
-    // TODO: Fix.
     if (typedProperties.all { it.validatedName == null }) {
         addStatement(
             "return %T(%T(" + typedProperties.joinToString(", ") { it.property.name } + "))",
@@ -227,6 +113,7 @@ inline fun CodeBlock.Builder.returnValidatedModel(
             when (it) {
                 is TypedModelProperty.Standard -> null
                 is TypedModelProperty.ValueObject -> it.validatedName to it.type.fieldFailureClassName
+                is TypedModelProperty.ValueObjectOption -> it.validatedName to it.fieldFailureClassName
                 is TypedModelProperty.ModelTemplate -> it.validatedName to getModelPropertyFailure(it.type)
             }
         }
@@ -275,11 +162,6 @@ fun CodeBlock.Builder.constructorCall(
     } + ")\n",
     className
 )
-
-fun CodeBlock.Builder.vNameConstructorCall(
-    className: ClassName,
-    params: List<ModelProperty>
-): CodeBlock.Builder = add("%T(" + params.joinToString(", ") { it.vName } + ")\n", className)
 
 /**
  * Adds a return statement.

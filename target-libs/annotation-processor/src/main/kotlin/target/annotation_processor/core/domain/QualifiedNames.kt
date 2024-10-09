@@ -2,6 +2,7 @@ package target.annotation_processor.core.domain
 
 object QualifiedNames {
     const val ARROW_EITHER = "arrow.core.Either"
+    const val ARROW_OPTION = "arrow.core.Option"
     const val ARROW_FLAT_MAP = "arrow.core.flatMap"
 
     const val VALIDATABLE = "target.annotation.Validatable"
