@@ -261,9 +261,8 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
             // Finding value object option.
             val valueObjectReferencePair = typeArguments.firstNotNullOfOrNull { arg ->
                 val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
-                val argType = resolveTypeReference(argTypeRef)
-                val argTypeDec = argType.declaration
-                if (argTypeDec !is KSClassDeclaration) return@firstNotNullOfOrNull null
+                val (argType, argTypeDec) = resolveTypeReferenceAndClassDeclaration(argTypeRef)
+                    ?: return@firstNotNullOfOrNull null
 
                 argTypeDec.superTypes.firstOrNull {
                     resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
@@ -327,6 +326,15 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
                 }
             }
         )
+    }
+
+    private fun resolveTypeReferenceAndClassDeclaration(reference: KSTypeReference): Pair<KSType, KSClassDeclaration>? {
+        val type = resolveTypeReference(reference)
+        return when (val it = type.declaration) {
+            is KSClassDeclaration -> type to it
+            is KSTypeAlias -> resolveTypeReferenceAndClassDeclaration(it.type)
+            else -> null
+        }
     }
 
     private fun resolveValueValidatorFailureType(valueObjectDeclaration: KSClassDeclaration): TypeName {
