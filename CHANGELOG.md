@@ -4,7 +4,7 @@ Feature:
 
 - Kotlin 2.0.20
 - KSP 2.0.20-1.0.25
-- Arrow 1.2.0
+- Arrow 1.2.4
 - Dokka 1.9.20
 
 Breaking:
