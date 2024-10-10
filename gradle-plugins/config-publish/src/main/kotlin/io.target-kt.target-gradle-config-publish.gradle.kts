@@ -35,8 +35,8 @@ publishing {
             )
 
             credentials {
-                username = propertyString("ossrhUsername")
-                password = propertyString("ossrhPassword")
+                username = propertyString("ossrhTokenId")
+                password = propertyString("ossrhTokenValue")
             }
         }
     }
