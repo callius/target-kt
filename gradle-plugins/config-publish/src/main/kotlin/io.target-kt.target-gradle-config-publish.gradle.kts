@@ -14,6 +14,14 @@ val javadocJar by tasks.registering(Jar::class) {
     from(dokkaHtmlProvider.get().property("outputDirectory"))
 }
 
+// region Fix Gradle warning about signing tasks using publishing task outputs without explicit dependencies
+// https://github.com/gradle/gradle/issues/26091#issuecomment-1722947958
+tasks.withType<AbstractPublishToMaven>().configureEach {
+    val signingTasks = tasks.withType<Sign>()
+    mustRunAfter(signingTasks)
+}
+// endregion
+
 publishing {
     repositories {
         maven {
@@ -22,13 +30,13 @@ publishing {
             val releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
             val snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
             url = uri(
-                if (propertyString("target.version").endsWith("-SNAPSHOT", ignoreCase = true)) snapshotsRepoUrl
+                if (propertyString("target.version").contains("SNAPSHOT", ignoreCase = true)) snapshotsRepoUrl
                 else releasesRepoUrl
             )
 
             credentials {
-                username = propertyString("ossrhUsername")
-                password = propertyString("ossrhPassword")
+                username = propertyString("ossrhTokenId")
+                password = propertyString("ossrhTokenValue")
             }
         }
     }

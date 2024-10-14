@@ -19,7 +19,7 @@ abstract class CachedTypeReferenceResolverVisitorVoid : KSVisitorVoid() {
 
     protected fun isValueObject(type: KSType, typeArguments: List<KSTypeArgument> = emptyList()): Boolean {
         return (type.declaration is KSClassDeclaration && (type.declaration as KSClassDeclaration).superTypes.any {
-            resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.valueObject
+            resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
         }) || typeArguments.any { it.type?.let(::isValueObject) ?: false }
     }
 }

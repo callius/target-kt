@@ -7,7 +7,6 @@ import target.annotation_processor.core.domain.nelOf
 
 fun generateFieldFailureSpec(
     fieldFailureClassName: ClassName,
-    requiredFieldFailureClassName: ClassName,
     properties: List<ModelProperty>
 ): TypeSpec {
     return TypeSpec.interfaceBuilder(fieldFailureClassName)
@@ -17,21 +16,19 @@ fun generateFieldFailureSpec(
                 properties.forEach {
                     when (it.type) {
                         is ModelPropertyType.ValueObject -> add(
-                            TypeSpec.classBuilder(it.type.fieldFailureClassName.simpleName)
-                                .addModifiers(KModifier.DATA)
-                                .primaryConstructor(
-                                    FunSpec.constructorBuilder()
-                                        .addParameter("parent", it.type.valueFailureType)
-                                        .build()
-                                )
-                                .addProperty(
-                                    PropertySpec.builder("parent", it.type.valueFailureType)
-                                        .initializer("parent")
-                                        .build()
-                                )
-                                .addSuperinterface(fieldFailureClassName)
-                                .run { if (it.isExternal) this else addSuperinterface(requiredFieldFailureClassName) }
-                                .build()
+                            valueObjectFieldFailure(
+                                className = it.type.fieldFailureClassName.simpleName,
+                                valueFailureTypeName = it.type.valueFailureType,
+                                fieldFailureClassName = fieldFailureClassName
+                            )
+                        )
+
+                        is ModelPropertyType.ValueObjectOption -> add(
+                            valueObjectFieldFailure(
+                                className = it.type.fieldFailureClassName.simpleName,
+                                valueFailureTypeName = it.type.valueFailureType,
+                                fieldFailureClassName = fieldFailureClassName
+                            )
                         )
 
                         is ModelPropertyType.ModelTemplate -> {
@@ -42,11 +39,14 @@ fun generateFieldFailureSpec(
                                     superInterface = fieldFailureClassName
                                 )
                             )
+                        }
+
+                        is ModelPropertyType.ModelTemplateOption -> {
                             add(
                                 modelTemplateFieldFailure(
-                                    name = it.type.requiredFieldFailureClassName.simpleName,
-                                    nelFieldFailureType = nelOf(it.type.requiredFieldFailureType),
-                                    superInterface = requiredFieldFailureClassName
+                                    name = it.type.fieldFailureClassName.simpleName,
+                                    nelFieldFailureType = nelOf(it.type.fieldFailureType),
+                                    superInterface = fieldFailureClassName
                                 )
                             )
                         }
@@ -58,6 +58,25 @@ fun generateFieldFailureSpec(
         )
         .build()
 }
+
+private fun valueObjectFieldFailure(
+    className: String,
+    valueFailureTypeName: TypeName,
+    fieldFailureClassName: ClassName
+) = TypeSpec.classBuilder(className)
+    .addModifiers(KModifier.DATA)
+    .primaryConstructor(
+        FunSpec.constructorBuilder()
+            .addParameter("parent", valueFailureTypeName)
+            .build()
+    )
+    .addProperty(
+        PropertySpec.builder("parent", valueFailureTypeName)
+            .initializer("parent")
+            .build()
+    )
+    .addSuperinterface(fieldFailureClassName)
+    .build()
 
 private fun modelTemplateFieldFailure(
     name: String,

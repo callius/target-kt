@@ -1,4 +1,3 @@
-@Suppress("DSL_SCOPE_VIOLATION")
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     id("io.target-kt.target-gradle-config-kotlin")
@@ -12,7 +11,6 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(libs.kotlin.stdlibCommon)
-                implementation(libs.kotlinx.datetime)
                 implementation(project(":target-core"))
             }
         }
