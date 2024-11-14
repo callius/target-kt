@@ -54,5 +54,19 @@ private fun ModelPropertyType.toValueObjectTypeName(): TypeName {
 
         is ModelPropertyType.ValueObject -> valueObjectValueType
         is ModelPropertyType.ValueObjectOption -> optionOf(valueObjectValueType)
+
+        is ModelPropertyType.ModelTemplateList -> listNameOf(
+            eitherOf(
+                nelOf(fieldFailureType),
+                modelType.withNullability(false)
+            )
+        ).withNullability(type.isNullable)
+
+        is ModelPropertyType.ModelTemplateNel -> nelOf(
+            eitherOf(
+                nelOf(fieldFailureType),
+                modelType.withNullability(false)
+            )
+        ).withNullability(type.isNullable)
     }
 }

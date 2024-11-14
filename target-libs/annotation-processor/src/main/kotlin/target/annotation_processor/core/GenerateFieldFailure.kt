@@ -51,6 +51,26 @@ fun generateFieldFailureSpec(
                             )
                         }
 
+                        is ModelPropertyType.ModelTemplateList -> {
+                            add(
+                                modelTemplateFieldFailure(
+                                    name = it.type.fieldFailureClassName.simpleName,
+                                    nelFieldFailureType = nelOf(nelOf(it.type.fieldFailureType)),
+                                    superInterface = fieldFailureClassName
+                                )
+                            )
+                        }
+
+                        is ModelPropertyType.ModelTemplateNel -> {
+                            add(
+                                modelTemplateFieldFailure(
+                                    name = it.type.fieldFailureClassName.simpleName,
+                                    nelFieldFailureType = nelOf(nelOf(it.type.fieldFailureType)),
+                                    superInterface = fieldFailureClassName
+                                )
+                            )
+                        }
+
                         is ModelPropertyType.Standard -> Unit
                     }
                 }

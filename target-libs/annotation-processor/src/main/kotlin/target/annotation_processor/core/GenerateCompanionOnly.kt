@@ -18,6 +18,8 @@ fun generateCompanionOnlySpec(
             properties.map {
                 when (it.type) {
                     is ModelPropertyType.ModelTemplate,
+                    is ModelPropertyType.ModelTemplateList,
+                    is ModelPropertyType.ModelTemplateNel,
                     is ModelPropertyType.ValueObject -> ParameterSpec.builder(it.name, it.type.toTypeName())
                         .build()
 
@@ -62,5 +64,7 @@ private fun ModelPropertyType.toTypeName(): TypeName {
 
         is ModelPropertyType.ValueObjectOption -> optionOf(valueObjectType).withNullability(type.isNullable)
         is ModelPropertyType.ModelTemplateOption -> optionOf(modelType).withNullability(type.isNullable)
+        is ModelPropertyType.ModelTemplateList -> listNameOf(modelType).withNullability(type.isNullable)
+        is ModelPropertyType.ModelTemplateNel -> nelOf(modelType).withNullability(type.isNullable)
     }
 }

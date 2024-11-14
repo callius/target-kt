@@ -291,6 +291,52 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
             }
         }
 
+        if (typeDeclaration.toClassName().canonicalName == QualifiedNames.ARROW_NON_EMPTY_LIST) {
+            // Finding model template nel.
+            val validatableTypeArgument = typeArguments.firstNotNullOfOrNull { arg ->
+                val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
+                resolveTypeReference(argTypeRef).takeIf {
+                    it.declaration.annotations.any(::annotationShortNameEqualsValidatable)
+                }
+            }
+            if (validatableTypeArgument != null) {
+                val modelTypeName = validatableTypeArgument.toClassNameWithNullability()
+                val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
+                return ModelPropertyType.ModelTemplateNel(
+                    type = ClassNames.option.withNullability(type.nullability),
+                    modelType = modelTypeName,
+                    fieldFailureType = ClassName(
+                        modelTypeName.packageName,
+                        modelTypeName.simpleName.appendFieldFailure()
+                    ),
+                    fieldFailureClassName = fieldFailureClassName.nestedClass(upperPropertyName)
+                )
+            }
+        }
+
+        if (typeDeclaration.toClassName().canonicalName == QualifiedNames.LIST) {
+            // Finding model template list.
+            val validatableTypeArgument = typeArguments.firstNotNullOfOrNull { arg ->
+                val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
+                resolveTypeReference(argTypeRef).takeIf {
+                    it.declaration.annotations.any(::annotationShortNameEqualsValidatable)
+                }
+            }
+            if (validatableTypeArgument != null) {
+                val modelTypeName = validatableTypeArgument.toClassNameWithNullability()
+                val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
+                return ModelPropertyType.ModelTemplateList(
+                    type = ClassNames.option.withNullability(type.nullability),
+                    modelType = modelTypeName,
+                    fieldFailureType = ClassName(
+                        modelTypeName.packageName,
+                        modelTypeName.simpleName.appendFieldFailure()
+                    ),
+                    fieldFailureClassName = fieldFailureClassName.nestedClass(upperPropertyName)
+                )
+            }
+        }
+
         val valueObjectReference = typeDeclaration.superTypes.firstOrNull {
             resolveTypeReference(it).declaration.qualifiedName?.asString() == QualifiedNames.VALUE_OBJECT
         }
