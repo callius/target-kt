@@ -1,3 +1,18 @@
+## 0.7.0
+
+Feature:
+
+- Kotlin 2.1.10
+- KSP 2.1.10-1.0.29
+- Arrow 2.0.1
+- Dokka 1.9.20
+
+## 0.6.0
+
+Breaking:
+
+- Updated list parameter validation.
+
 ## 0.5.0
 
 Feature:
