@@ -14,9 +14,8 @@ object ClassNames {
     val some = ClassName("arrow.core", "Some")
 
     val nel = ClassName("arrow.core", "Nel")
-    val nonEmptyList = ClassName("arrow.core", "NonEmptyList")
 
-    val buildable = ClassName("target.core", "Buildable")
+    val list = ClassName("kotlin.collections", "List")
 }
 
 fun eitherOf(left: TypeName, right: TypeName): TypeName = ClassNames.either.parameterizedBy(left, right)
@@ -25,4 +24,4 @@ fun optionOf(type: TypeName) = ClassNames.option.parameterizedBy(type)
 
 fun nelOf(type: TypeName) = ClassNames.nel.parameterizedBy(type)
 
-fun buildableOf(type: TypeName) = ClassNames.buildable.parameterizedBy(type)
+fun listNameOf(type: TypeName) = ClassNames.list.parameterizedBy(type)

@@ -20,6 +20,4 @@ data class ModelProperty(
      * The validated name of this property.
      */
     val vName: String get() = 'v' + name.replaceFirstChar { it.uppercaseChar() }
-
-    fun vNameIfNullable() = if (type.type.isNullable) vName else name
 }
