@@ -11,6 +11,9 @@ project(":target-annotation").projectDir = File("target-libs/annotation")
 include("target-annotation-processor")
 project(":target-annotation-processor").projectDir = File("target-libs/annotation-processor")
 
+include("integration-test")
+project(":integration-test").projectDir = File("integration-test")
+
 includeBuild("gradle-plugins/config-kotlin")
 includeBuild("gradle-plugins/config-publish")
 

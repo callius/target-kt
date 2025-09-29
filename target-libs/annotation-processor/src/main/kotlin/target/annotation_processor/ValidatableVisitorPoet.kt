@@ -10,6 +10,7 @@ import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ksp.toClassName
+import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import target.annotation_processor.core.domain.*
 import target.annotation_processor.core.extension.addGeneratedComment
@@ -494,10 +495,14 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
     ): TypeName {
         val typeArguments = typeReference.element!!.typeArguments
         return if (typeArguments.isEmpty()) {
-            type.toClassName()
+            type.toTypeName()
         } else {
             val parentsPlusThis = parents.plus(typeReference to type.declaration)
-            type.toClassName().parameterizedBy(
+            val packageName = type.declaration.packageName.asString()
+            ClassName(
+                packageName,
+                type.declaration.qualifiedName!!.asString().removePrefix("$packageName.").split(".")
+            ).parameterizedBy(
                 List(typeArguments.size) { index ->
                     resolveTypeParameter(index, parentsPlusThis.lastIndex, parentsPlusThis)
                 }
