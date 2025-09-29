@@ -13,6 +13,7 @@
 /compiler.xml
 /misc.xml
 /modules.xml
+/modules/
 /gradle.xml
 /jarRepositories.xml
 /kotlinc.xml

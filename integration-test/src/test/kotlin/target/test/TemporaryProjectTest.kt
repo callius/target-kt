@@ -15,8 +15,12 @@ abstract class TemporaryProjectTest {
     }
 
     fun persistFailedTestProject(projectName: String) {
-        val destinationFolder = File("src/test/resources/failures", projectName)
-        destinationFolder.delete()
-        tempFolder.copyRecursively(destinationFolder, overwrite = true)
+        tempFolder.copyRecursively(
+            File(
+                "src/test/resources/failures",
+                "$projectName-${System.currentTimeMillis()}"
+            ),
+            overwrite = true
+        )
     }
 }
