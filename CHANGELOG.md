@@ -2,7 +2,7 @@
 
 Feature:
 
-- Added `integration-test` package.
+- Added initial `integration-test` package.
 - Updated maven central publishing.
 - Kotlin 2.2.20
 - KSP 2.2.20-2.0.2
