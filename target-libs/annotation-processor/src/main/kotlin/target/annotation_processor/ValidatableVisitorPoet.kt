@@ -9,13 +9,10 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.ksp.toClassName
+import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import target.annotation_processor.core.domain.*
-import target.annotation_processor.core.extension.addGeneratedComment
-import target.annotation_processor.core.extension.appendFieldFailure
-import target.annotation_processor.core.extension.toClassNameWithNullability
-import target.annotation_processor.core.extension.withNullability
+import target.annotation_processor.core.extension.*
 import target.annotation_processor.core.generateCompanionOfSpec
 import target.annotation_processor.core.generateCompanionOnlySpec
 import target.annotation_processor.core.generateFieldFailureSpec
@@ -182,7 +179,7 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
 
         // Finding model template option.
         if (modelTemplate != null) {
-            val modelTypeName = type.toClassName()
+            val modelTypeName = type.toClassNameWithoutParameters()
             val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
             return ModelPropertyType.ModelTemplate(
                 type = modelTypeName.withNullability(type.nullability),
@@ -210,7 +207,7 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
             )
 
             else -> ModelPropertyType.Standard(
-                type = type.toClassName().withNullability(type.nullability),
+                type = type.toClassNameWithoutParameters().withNullability(type.nullability),
                 typeArguments = typeArguments.map {
                     when (it.variance) {
                         Variance.STAR -> ModelPropertyTypeArgument.Star
@@ -236,7 +233,8 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
         typeDeclaration: KSClassDeclaration,
         fieldFailureClassName: ClassName
     ): ModelPropertyType {
-        if (typeDeclaration.toClassName().canonicalName == QualifiedNames.ARROW_OPTION) {
+        val canonicalName = typeDeclaration.canonicalName()
+        if (canonicalName == QualifiedNames.ARROW_OPTION) {
             // Finding model template option.
             val validatableTypeArgument = typeArguments.firstNotNullOfOrNull { arg ->
                 val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
@@ -245,7 +243,8 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
                 }
             }
             if (validatableTypeArgument != null) {
-                val modelTypeName = validatableTypeArgument.toClassNameWithNullability()
+                val modelTypeName = validatableTypeArgument.toClassNameWithoutParameters()
+                    .withNullability(validatableTypeArgument.nullability)
                 val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
                 return ModelPropertyType.ModelTemplateOption(
                     type = ClassNames.option.withNullability(type.nullability),
@@ -279,10 +278,10 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
 
                 return ModelPropertyType.ValueObjectOption(
                     type = ClassNames.option.withNullability(type.nullability),
-                    valueObjectType = valueObjectReferencePair.first.toClassNameWithNullability(),
-                    valueObjectValueType = valueObjectValueType.toClassName().withNullability(
-                        valueObjectReferencePair.first.nullability
-                    ),
+                    valueObjectType = valueObjectReferencePair.first.toClassNameWithoutParameters()
+                        .withNullability(valueObjectReferencePair.first.nullability),
+                    valueObjectValueType = valueObjectValueType.toClassNameWithoutParameters()
+                        .withNullability(valueObjectReferencePair.first.nullability),
                     valueFailureType = valueFailureType,
                     fieldFailureClassName = fieldFailureClassName.nestedClass(
                         propertyName.replaceFirstChar { it.uppercaseChar() }
@@ -291,7 +290,7 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
             }
         }
 
-        if (typeDeclaration.toClassName().canonicalName == QualifiedNames.ARROW_NON_EMPTY_LIST) {
+        if (canonicalName == QualifiedNames.ARROW_NON_EMPTY_LIST) {
             // Finding model template nel.
             val validatableTypeArgument = typeArguments.firstNotNullOfOrNull { arg ->
                 val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
@@ -300,7 +299,8 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
                 }
             }
             if (validatableTypeArgument != null) {
-                val modelTypeName = validatableTypeArgument.toClassNameWithNullability()
+                val modelTypeName = validatableTypeArgument.toClassNameWithoutParameters()
+                    .withNullability(validatableTypeArgument.nullability)
                 val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
                 return ModelPropertyType.ModelTemplateNel(
                     type = ClassNames.option.withNullability(type.nullability),
@@ -314,7 +314,7 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
             }
         }
 
-        if (typeDeclaration.toClassName().canonicalName == QualifiedNames.LIST) {
+        if (canonicalName == QualifiedNames.LIST) {
             // Finding model template list.
             val validatableTypeArgument = typeArguments.firstNotNullOfOrNull { arg ->
                 val argTypeRef = arg.type ?: return@firstNotNullOfOrNull null
@@ -323,7 +323,8 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
                 }
             }
             if (validatableTypeArgument != null) {
-                val modelTypeName = validatableTypeArgument.toClassNameWithNullability()
+                val modelTypeName = validatableTypeArgument.toClassNameWithoutParameters()
+                    .withNullability(validatableTypeArgument.nullability)
                 val upperPropertyName = propertyName.replaceFirstChar { it.uppercaseChar() }
                 return ModelPropertyType.ModelTemplateList(
                     type = ClassNames.option.withNullability(type.nullability),
@@ -346,8 +347,9 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
             val valueFailureType = resolveValueValidatorFailureType(typeDeclaration)
 
             return ModelPropertyType.ValueObject(
-                type = type.toClassNameWithNullability(),
-                valueObjectValueType = valueObjectValueType.toClassName().withNullability(type.nullability),
+                type = type.toClassNameWithoutParameters().withNullability(type.nullability),
+                valueObjectValueType = valueObjectValueType.toClassNameWithoutParameters()
+                    .withNullability(type.nullability),
                 valueFailureType = valueFailureType,
                 fieldFailureClassName = fieldFailureClassName.nestedClass(
                     propertyName.replaceFirstChar { it.uppercaseChar() }
@@ -356,7 +358,7 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
         }
 
         return ModelPropertyType.Standard(
-            type = type.toClassName().withNullability(type.nullability),
+            type = type.toClassNameWithoutParameters().withNullability(type.nullability),
             typeArguments = typeArguments.map {
                 when (it.variance) {
                     Variance.STAR -> ModelPropertyTypeArgument.Star
@@ -494,10 +496,10 @@ class ValidatableVisitorPoet(private val codeGenerator: CodeGenerator, private v
     ): TypeName {
         val typeArguments = typeReference.element!!.typeArguments
         return if (typeArguments.isEmpty()) {
-            type.toClassName()
+            type.toTypeName()
         } else {
             val parentsPlusThis = parents.plus(typeReference to type.declaration)
-            type.toClassName().parameterizedBy(
+            type.toClassNameWithoutParameters().parameterizedBy(
                 List(typeArguments.size) { index ->
                     resolveTypeParameter(index, parentsPlusThis.lastIndex, parentsPlusThis)
                 }
